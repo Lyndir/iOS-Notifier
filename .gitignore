@@ -1,0 +1,11 @@
+# Compiled objects.
+/target
+
+# OS-Specific junk.
+.DS_Store
+
+# Eclipse IDE
+/.classpath
+/.project
+/.settings
+/eclipse
