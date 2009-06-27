@@ -42,10 +42,48 @@ public class NotificationDevice {
     }
 
     /**
+     * Create a new {@link NotificationDevice} instance.
+     * 
+     * @param deviceTokenHex
+     *            The device's trust token as a string of hexadecimal characters. This token will identify the
+     *            destination device.
+     */
+    public NotificationDevice(String deviceTokenHex) {
+
+        this( deviceTokenHexToBytes( deviceTokenHex ) );
+    }
+
+    /**
+     * Convert a string of hexadecimal characters into a binary device token.
+     */
+    private static byte[] deviceTokenHexToBytes(String deviceTokenHex) {
+
+        byte[] deviceToken = new byte[deviceTokenHex.length() / 2];
+        for (int i = 0; i < deviceTokenHex.length(); i += 2)
+            deviceToken[i / 2] = Integer.decode( "0x" + deviceTokenHex.subSequence( i, i + 2 ) ).byteValue();
+        return deviceToken;
+    }
+
+    /**
      * @return The token of this {@link NotificationDevice}.
      */
     public byte[] getToken() {
 
         return token;
+    }
+
+    /**
+     * This method generates a hexadecimal representation of the device token.
+     * 
+     * {@inheritDoc}
+     */
+    @Override
+    public String toString() {
+
+        StringBuffer bytes = new StringBuffer( "[d: " );
+        for (byte b : token)
+            bytes.append( Integer.toHexString( b ) );
+
+        return bytes.append( ']' ).toString();
     }
 }
