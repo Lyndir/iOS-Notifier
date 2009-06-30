@@ -15,6 +15,9 @@
  */
 package com.lyndir.lhunath.ipos.notifier;
 
+import java.util.Formatter;
+
+
 /**
  * <h2>{@link NotificationDevice}<br>
  * <sub>An iPhone OS device that can receive APNs notifications.</sub></h2>
@@ -60,7 +63,8 @@ public class NotificationDevice {
 
         byte[] deviceToken = new byte[deviceTokenHex.length() / 2];
         for (int i = 0; i < deviceTokenHex.length(); i += 2)
-            deviceToken[i / 2] = Integer.decode( "0x" + deviceTokenHex.subSequence( i, i + 2 ) ).byteValue();
+            deviceToken[i / 2] = Integer.valueOf( deviceTokenHex.substring( i, i + 2 ), 16 ).byteValue();
+
         return deviceToken;
     }
 
@@ -81,8 +85,10 @@ public class NotificationDevice {
     public String toString() {
 
         StringBuffer bytes = new StringBuffer( "[d: " );
+        Formatter formatter = new Formatter( bytes );
+
         for (byte b : token)
-            bytes.append( Integer.toHexString( b ) );
+            formatter.format( "%02X", b );
 
         return bytes.append( ']' ).toString();
     }

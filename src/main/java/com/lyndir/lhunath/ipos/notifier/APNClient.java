@@ -478,6 +478,8 @@ public class APNClient implements NetworkConnectionStateListener, NetworkDataLis
         // The interface command.
         byte command = (byte) 0;
 
+        logger.inf( "Sending notification %s to device %s", payLoad, device );
+
         // Allocate the interface byte buffer.
         int notificationByteSize = getInterfaceByteSize( tokenLength, payLoadLength );
         ByteBuffer notificationData = ByteBuffer.allocate( notificationByteSize ).order( byteOrder );
