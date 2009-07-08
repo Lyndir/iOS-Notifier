@@ -16,10 +16,11 @@
 package com.lyndir.lhunath.ipos.notifier;
 
 import java.io.IOException;
-import java.net.Socket;
+import java.net.InetSocketAddress;
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.channels.SocketChannel;
 import java.nio.charset.Charset;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.KeyManagementException;
@@ -32,9 +33,6 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -71,36 +69,22 @@ import com.lyndir.lhunath.lib.system.logging.Logger;
  */
 public class APNClient implements NetworkConnectionStateListener, NetworkDataListener {
 
-    private static final Logger                 logger                     = Logger.get( APNClient.class );
+    private static final Logger                 logger          = Logger.get( APNClient.class );
 
-    private static final String                 DEFAULT_SBOX_APNS_PROTOCOL = "TLSv1";
-    private static final String                 DEFAULT_SBOX_APNS_HOSTNAME = "gateway.sandbox.push.apple.com";
-    private static final int                    DEFAULT_SBOX_APNS_TCP_PORT = 2195;
-    private static final String                 DEFAULT_SBOX_AFBS_HOSTNAME = "feedback.sandbox.push.apple.com";
-    private static final int                    DEFAULT_SBOX_AFBS_TCP_PORT = 2196;
+    private Set<NetworkConnectionStateListener> stateListeners  = new HashSet<NetworkConnectionStateListener>();
+    private APNQueue                            apnQueue        = new APNQueue( this );
 
-    private static final String                 DEFAULT_PROD_APNS_PROTOCOL = "TLSv1";
-    private static final String                 DEFAULT_PROD_APNS_HOSTNAME = "gateway.push.apple.com";
-    private static final int                    DEFAULT_PROD_APNS_TCP_PORT = 2195;
-    private static final String                 DEFAULT_PROD_AFBS_HOSTNAME = "feedback.push.apple.com";
-    private static final int                    DEFAULT_PROD_AFBS_TCP_PORT = 2196;
+    private Charset                             payloadEncoding = Charset.forName( "UTF-8" );
+    private ByteOrder                           byteOrder       = ByteOrder.BIG_ENDIAN;
+    private short                               maxPayloadSize  = 256;
 
-    // Local stunnel-netcat debugging environment.
-    // private static final String DEFAULT_APNS_HOSTNAME = "localhost";
-    // private static final int DEFAULT_APNS_TCP_PORT = 10021;
-
-    private Set<NetworkConnectionStateListener> stateListeners             = new HashSet<NetworkConnectionStateListener>();
-    private List<ByteBuffer>                    notificationQueue          = new LinkedList<ByteBuffer>();
-
-    private Charset                             payloadEncoding            = Charset.forName( "UTF-8" );
-    private ByteOrder                           byteOrder                  = ByteOrder.BIG_ENDIAN;
-    private short                               maxPayloadSize             = 256;
+    private KeyManagerFactory                   keyManagerFactory;
+    private TrustManagerFactory                 trustManagerFactory;
+    private APNServerConfig                     serverConfig;
 
     private Network                             network;
-    private SSLEngine                           apnsSslEngine;
-    private SSLEngine                           feedbackSslEngine;
-    private Socket                              apnsSocket;
-    private Socket                              feedbackSocket;
+    private SocketChannel                       apnsChannel;
+    private SocketChannel                       feedbackChannel;
     private ByteBuffer                          feedbackBuffer;
 
     Map<NotificationDevice, Date>               feedbackDevices;
@@ -121,12 +105,10 @@ public class APNClient implements NetworkConnectionStateListener, NetworkDataLis
      *            The keystore which provides all required SSL keys and certificates.
      * @param privateKeyPassword
      *            The password which protects the required <code>keyStore</code>'s private key.
-     * @param sandbox
-     *            <code>true</code>: Use the default sandbox APNs hosts.<br>
-     *            <code>false</code>: Use the default production APNs hosts.
+     * @param serverConfig
+     *            The {@link APNServerConfig} that determines the host configuration of the Apple Push Notification
+     *            server and Feedback service.
      * 
-     * @throws KeyManagementException
-     *             The SSL context could not be initialized from the provided private keys.
      * @throws UnrecoverableKeyException
      *             The private key could not be accessed from the <code>keyStore</code>. Perhaps the provided
      *             <code>privateKeyPassword</code> is incorrect.
@@ -135,57 +117,11 @@ public class APNClient implements NetworkConnectionStateListener, NetworkDataLis
      * @throws KeyStoreException
      *             The <code>keyStore</code> has not been properly loaded/initialized or is corrupt.
      */
-    public APNClient(KeyStore keyStore, String privateKeyPassword, boolean sandbox)
-            throws KeyManagementException, UnrecoverableKeyException, NoSuchAlgorithmException, KeyStoreException {
+    public APNClient(KeyStore keyStore, String privateKeyPassword, APNServerConfig serverConfig)
+            throws UnrecoverableKeyException, NoSuchAlgorithmException, KeyStoreException {
 
-        this( sandbox? DEFAULT_SBOX_APNS_HOSTNAME: DEFAULT_PROD_APNS_HOSTNAME, //
-              sandbox? DEFAULT_SBOX_APNS_TCP_PORT: DEFAULT_PROD_APNS_TCP_PORT, //
-              sandbox? DEFAULT_SBOX_AFBS_HOSTNAME: DEFAULT_PROD_AFBS_HOSTNAME, //
-              sandbox? DEFAULT_SBOX_AFBS_TCP_PORT: DEFAULT_PROD_AFBS_TCP_PORT, //
-              sandbox? DEFAULT_SBOX_APNS_PROTOCOL: DEFAULT_PROD_APNS_PROTOCOL, //
-              createKeyManagerFactory( keyStore, privateKeyPassword ), createTrustManagerFactory( keyStore ) );
-    }
-
-    /**
-     * Create a new {@link APNClient} instance by setting up the PKIX identity and trust to reasonable defaults from the
-     * given parameters.
-     * 
-     * @param keyStore
-     *            The keystore which provides all required SSL keys and certificates.
-     * @param privateKeyPassword
-     *            The password which protects the required <code>keyStore</code>'s private key.
-     * @param apnsHost
-     *            The hostname of the Apple Push Notification server (APNs).
-     * @param apnsPort
-     *            The port on which the Apple Push Notification server (APNs) listens.
-     * @param feedbackHost
-     *            The hostname of the Apple Push Notification Feedback Service.
-     * @param feedbackPort
-     *            The port on which the Apple Push Notification Feedback Service listens.
-     * @param protocol
-     *            The SSL/TLS protocol to use for secure communications to the Apple Push Notification server (APNs) and
-     *            Feedback Service.
-     *            <p>
-     *            Valid values depend on what is supported by the <code>sslProvider</code>, but generally speaking there
-     *            is: <code>SSLv2, SSLv3, TLSv1, TLSv1.1, SSLv2Hello</code>.
-     *            </p>
-     * 
-     * @throws KeyManagementException
-     *             The SSL context could not be initialized from the provided private keys.
-     * @throws UnrecoverableKeyException
-     *             The private key could not be accessed from the <code>keyStore</code>. Perhaps the provided
-     *             <code>privateKeyPassword</code> is incorrect.
-     * @throws NoSuchAlgorithmException
-     *             The <code>keyStore</code> provider does not support the necessary algorithms.
-     * @throws KeyStoreException
-     *             The <code>keyStore</code> has not been properly loaded/initialized or is corrupt.
-     */
-    public APNClient(KeyStore keyStore, String privateKeyPassword, String apnsHost, int apnsPort, String feedbackHost,
-            int feedbackPort, String protocol)
-            throws KeyManagementException, UnrecoverableKeyException, NoSuchAlgorithmException, KeyStoreException {
-
-        this( apnsHost, apnsPort, feedbackHost, feedbackPort, protocol, //
-              createKeyManagerFactory( keyStore, privateKeyPassword ), createTrustManagerFactory( keyStore ) );
+        this( createKeyManagerFactory( keyStore, privateKeyPassword ), createTrustManagerFactory( keyStore ),
+              serverConfig );
     }
 
     /**
@@ -204,76 +140,21 @@ public class APNClient implements NetworkConnectionStateListener, NetworkDataLis
      *            The factory that will create the SSL context's {@link TrustManager}s.
      * @param keyManagerFactory
      *            The factory that will create the SSL context's {@link KeyManager}s.
-     * @param sandbox
-     *            <code>true</code>: Use the default sandbox APNs hosts.<br>
-     *            <code>false</code>: Use the default production APNs hosts.
+     * @param serverConfig
+     *            The {@link APNServerConfig} that determines the host configuration of the Apple Push Notification
+     *            server and Feedback service.
      * 
      * @throws KeyManagementException
      *             The SSL context could not be initialized from the provided private keys.
      * @throws NoSuchAlgorithmException
      *             The <code>keyStore</code> provider does not support the necessary algorithms.
      */
-    public APNClient(KeyManagerFactory keyManagerFactory, TrustManagerFactory trustManagerFactory, boolean sandbox)
-            throws KeyManagementException, NoSuchAlgorithmException {
+    public APNClient(KeyManagerFactory keyManagerFactory, TrustManagerFactory trustManagerFactory,
+            APNServerConfig serverConfig) {
 
-        this( sandbox? DEFAULT_SBOX_APNS_HOSTNAME: DEFAULT_PROD_APNS_HOSTNAME, //
-              sandbox? DEFAULT_SBOX_APNS_TCP_PORT: DEFAULT_PROD_APNS_TCP_PORT, //
-              sandbox? DEFAULT_SBOX_AFBS_HOSTNAME: DEFAULT_PROD_AFBS_HOSTNAME, //
-              sandbox? DEFAULT_SBOX_AFBS_TCP_PORT: DEFAULT_PROD_AFBS_TCP_PORT, //
-              sandbox? DEFAULT_SBOX_APNS_PROTOCOL: DEFAULT_PROD_APNS_PROTOCOL, //
-              keyManagerFactory, trustManagerFactory );
-    }
-
-    /**
-     * Create a new {@link APNClient} instance using a custom configured {@link KeyManagerFactory} and
-     * {@link TrustManagerFactory} to provide PKIX identity and trust.
-     * 
-     * @param apnsHost
-     *            The hostname of the Apple Push Notification server (APNs).
-     * @param apnsPort
-     *            The port on which the Apple Push Notification server (APNs) listens.
-     * @param feedbackHost
-     *            The hostname of the Apple Push Notification Feedback Service.
-     * @param feedbackPort
-     *            The port on which the Apple Push Notification Feedback Service listens.
-     * @param protocol
-     *            The SSL/TLS protocol to use for secure communications to the Apple Push Notification server (APNs).
-     *            <p>
-     *            Valid values depend on what is supported by the <code>sslProvider</code>, but generally speaking there
-     *            is: <code>SSL, SSLv2, SSLv3, TLS, TLSv1, TLSv1.1, SSLv2Hello</code>.
-     *            </p>
-     * @param trustManagerFactory
-     *            The factory that will create the SSL context's {@link TrustManager}s.
-     * @param keyManagerFactory
-     *            The factory that will create the SSL context's {@link KeyManager}s.
-     * 
-     * @throws KeyManagementException
-     *             The SSL context could not be initialized from the provided private keys.
-     * @throws NoSuchAlgorithmException
-     *             The <code>keyStore</code> provider does not support the necessary algorithms.
-     */
-    public APNClient(String apnsHost, int apnsPort, String feedbackHost, int feedbackPort, String protocol,
-            KeyManagerFactory keyManagerFactory, TrustManagerFactory trustManagerFactory)
-            throws KeyManagementException, NoSuchAlgorithmException {
-
-        this( createSSLEngine( apnsHost, apnsPort, protocol, keyManagerFactory, trustManagerFactory ),
-              createSSLEngine( feedbackHost, feedbackPort, protocol, keyManagerFactory, trustManagerFactory ) );
-    }
-
-    /**
-     * Create a new {@link APNClient} instance using a custom configured {@link SSLEngine}s.
-     * 
-     * @param apnsSslEngine
-     *            The fully configured SSL engine set up to provide the whole SSL negotiation logic for talking to the
-     *            APNs.
-     * @param feedbackSslEngine
-     *            The fully configured SSL engine set up to provide the whole SSL negotiation logic for talking to the
-     *            Feedback Service.
-     */
-    public APNClient(SSLEngine apnsSslEngine, SSLEngine feedbackSslEngine) {
-
-        this.apnsSslEngine = apnsSslEngine;
-        this.feedbackSslEngine = feedbackSslEngine;
+        this.keyManagerFactory = keyManagerFactory;
+        this.trustManagerFactory = trustManagerFactory;
+        this.serverConfig = serverConfig;
 
         int uninstalledDeviceRecordLength = 0;
         // UTC UNIX Timestamp
@@ -289,7 +170,13 @@ public class APNClient implements NetworkConnectionStateListener, NetworkDataLis
         network = new Network();
         network.registerConnectionStateListener( this );
         network.registerDataListener( this );
-        network.start();
+        network.startThread();
+    }
+
+    public synchronized void start() {
+
+        network.bringUp();
+        apnQueue.start();
     }
 
     /**
@@ -357,12 +244,10 @@ public class APNClient implements NetworkConnectionStateListener, NetworkDataLis
     /**
      * Creates an SSL engine.
      * 
-     * @param host
-     *            The hostname of the Apple Push Notification server (APNs).
-     * @param port
-     *            The port on which the Apple Push Notification server (APNs) listens.
+     * @param serverAddress
+     *            The hostname and port of the remote server socket to create an SSL engine for.
      * @param protocol
-     *            The SSL/TLS protocol to use for secure communications to the Apple Push Notification server (APNs).
+     *            The SSL/TLS protocol to use for secure transport encryption.
      *            <p>
      *            Valid values depend on what is supported by the <code>sslProvider</code>, but generally speaking there
      *            is: <code>SSL, SSLv2, SSLv3, TLS, TLSv1, TLSv1.1, SSLv2Hello</code>.
@@ -377,11 +262,11 @@ public class APNClient implements NetworkConnectionStateListener, NetworkDataLis
      * @throws NoSuchAlgorithmException
      *             The <code>keyStore</code> provider does not support the necessary algorithms.
      * @throws KeyManagementException
-     *             The SSL context could not be initialized from the provided private keys.
+     *             The SSL context could not be initialized using the available private keys.
      * 
      * @see http://java.sun.com/javase/6/docs/technotes/guides/security/StandardNames.html#jssenames
      */
-    private static SSLEngine createSSLEngine(String host, int port, String protocol,
+    private static SSLEngine createSSLEngine(InetSocketAddress serverAddress, String protocol,
                                              KeyManagerFactory keyManagerFactory,
                                              TrustManagerFactory trustManagerFactory)
             throws NoSuchAlgorithmException, KeyManagementException {
@@ -390,7 +275,7 @@ public class APNClient implements NetworkConnectionStateListener, NetworkDataLis
         SSLContext sslContext = SSLContext.getInstance( protocol );
         sslContext.init( keyManagerFactory.getKeyManagers(), trustManagerFactory.getTrustManagers(), null );
 
-        return sslContext.createSSLEngine( host, port );
+        return sslContext.createSSLEngine( serverAddress.getHostName(), serverAddress.getPort() );
     }
 
     /**
@@ -425,9 +310,12 @@ public class APNClient implements NetworkConnectionStateListener, NetworkDataLis
      * @param notificationPayLoads
      *            The notification payloads. These payloads describe the actual events the notification should trigger
      *            on the device. You can specify multiple notification events, and must specify at least one.
+     * 
+     * @return <code>false</code>: The notification queue is full. Wait for it to get emptied by the {@link APNQueue}
+     *         thread before trying again.
      */
-    public void queueNotification(NotificationDevice device, JSONObject customData,
-                                  NotificationPayLoad... notificationPayLoads) {
+    public boolean queueNotification(NotificationDevice device, JSONObject customData,
+                                     NotificationPayLoad... notificationPayLoads) {
 
         // Check Device Token length.
         int tokenLengthInt = device.getToken().length;
@@ -496,12 +384,20 @@ public class APNClient implements NetworkConnectionStateListener, NetworkDataLis
         notificationData.put( payLoadData );
         payLoadData.flip();
 
-        logger.inf( "Queueing: %s", payloadEncoding.decode( payLoadData ) );
-        payLoadData.flip();
-
         // All done with adding stuff to the notification data buffer. Flip & queue it.
         notificationData.flip();
-        notificationQueue.add( notificationData );
+        boolean wasQueued = apnQueue.offer( notificationData );
+
+        if (wasQueued) {
+            logger.inf( "Queued payload: %s", payloadEncoding.decode( payLoadData ) );
+            payLoadData.flip();
+        } else {
+            logger.wrn( "Queue full, not queueing payload: %s", payloadEncoding.decode( payLoadData ) );
+            payLoadData.flip();
+
+        }
+
+        return wasQueued;
     }
 
     /**
@@ -535,33 +431,34 @@ public class APNClient implements NetworkConnectionStateListener, NetworkDataLis
     }
 
     /**
-     * Dispatch all queued notifications to the APNs.
+     * Dispatch the given notification interface to the APNs.
      * 
      * <p>
-     * This operation will establish a connection to the configured APNs and dispatch all queued notifications.
+     * This operation will establish a connection to the configured APNs if one is not active already. Note that the
+     * connection will not be terminated automatically. You are responsible for calling {@link #closeAPNs()} when you
+     * determine you won't be dispatching any more messages soon.
      * </p>
+     * 
+     * @param notificationInterface
+     *            The {@link ByteBuffer} containing the raw interface of the notification data to send.
      * 
      * @throws IOException
      *             If the system failed to initiate a connection to the APNs.
+     * @throws NoSuchAlgorithmException
+     *             The <code>keyStore</code> provider does not support the necessary algorithms.
+     * @throws KeyManagementException
+     *             The SSL context could not be initialized using the available private keys.
      */
-    public void sendQueuedNotifications()
-            throws IOException {
+    public void dispatch(ByteBuffer notificationInterface)
+            throws IOException, KeyManagementException, NoSuchAlgorithmException {
 
-        if (notificationQueue.isEmpty())
-            return;
-        logger.inf( "Sending %d queued notifications", notificationQueue.size() );
-
-        if (apnsSocket == null)
-            apnsSocket = network.connect( apnsSslEngine.getPeerHost(), apnsSslEngine.getPeerPort(), apnsSslEngine );
-
-        Iterator<ByteBuffer> it = notificationQueue.iterator();
-        while (it.hasNext()) {
-            // Queue the next notification.
-            network.queue( it.next(), apnsSocket );
-
-            // Remove it from the queue once queueing it on the network succeeded.
-            it.remove();
+        if (apnsChannel == null || !apnsChannel.isOpen()) {
+            SSLEngine sslEngine = createSSLEngine( serverConfig.getApnsAddress(), serverConfig.getEncryptionProtocol(), //
+                                                   keyManagerFactory, trustManagerFactory );
+            apnsChannel = network.connect( serverConfig.getApnsAddress(), sslEngine );
         }
+
+        network.queue( notificationInterface, apnsChannel );
     }
 
     /**
@@ -578,14 +475,20 @@ public class APNClient implements NetworkConnectionStateListener, NetworkDataLis
      * 
      * @throws IOException
      *             If the system failed to initiate a connection to the APNs.
+     * @throws NoSuchAlgorithmException
+     *             The <code>keyStore</code> provider does not support the necessary algorithms.
+     * @throws KeyManagementException
+     *             The SSL context could not be initialized using the available private keys.
      */
     public void fetchUninstalledDevices(UninstalledDevicesCallback callback)
-            throws IOException {
+            throws IOException, KeyManagementException, NoSuchAlgorithmException {
 
-        if (feedbackSocket == null) {
-            feedbackSocket = network.connect( feedbackSslEngine.getPeerHost(), feedbackSslEngine.getPeerPort(),
-                                              feedbackSslEngine );
+        if (feedbackChannel == null || !feedbackChannel.isOpen()) {
             feedbackCallback = callback;
+            SSLEngine sslEngine = createSSLEngine( serverConfig.getFeedBackAddress(),
+                                                   serverConfig.getEncryptionProtocol(), //
+                                                   keyManagerFactory, trustManagerFactory );
+            feedbackChannel = network.connect( serverConfig.getFeedBackAddress(), sslEngine );
         } else
             logger.wrn( "Feedback Service is already being polled." );
     }
@@ -705,13 +608,13 @@ public class APNClient implements NetworkConnectionStateListener, NetworkDataLis
     /**
      * {@inheritDoc}
      */
-    public void connected(Socket connectionSocket) {
+    public void connected(SocketChannel connectionSocket) {
 
-        if (connectionSocket == apnsSocket)
+        if (connectionSocket == apnsChannel)
             logger.inf( "Connected to APNs" );
 
         // Forward this event to our own state listeners if it's about the APNs connection.
-        if (connectionSocket == apnsSocket)
+        if (connectionSocket == apnsChannel)
             for (NetworkConnectionStateListener stateListener : stateListeners)
                 stateListener.connected( connectionSocket );
     }
@@ -719,12 +622,12 @@ public class APNClient implements NetworkConnectionStateListener, NetworkDataLis
     /**
      * {@inheritDoc}
      */
-    public void closed(Socket connectionSocket, boolean resetByPeer) {
+    public void closed(SocketChannel connectionSocket, boolean resetByPeer) {
 
-        if (connectionSocket == apnsSocket)
+        if (connectionSocket == apnsChannel)
             logger.inf( "Disconnected from APNs" );
 
-        if (connectionSocket == feedbackSocket) {
+        if (connectionSocket == feedbackChannel) {
             logger.inf( "Disconnected from Feedback Service" );
             if (!feedbackDevices.isEmpty() && feedbackCallback != null)
                 new Thread( new Runnable() {
@@ -737,7 +640,7 @@ public class APNClient implements NetworkConnectionStateListener, NetworkDataLis
         }
 
         // Forward this event to our own state listeners if it's about the APNs connection.
-        if (connectionSocket == apnsSocket)
+        if (connectionSocket == apnsChannel)
             for (NetworkConnectionStateListener stateListener : stateListeners)
                 stateListener.closed( connectionSocket, resetByPeer );
     }
@@ -745,9 +648,9 @@ public class APNClient implements NetworkConnectionStateListener, NetworkDataLis
     /**
      * {@inheritDoc}
      */
-    public void received(ByteBuffer dataBuffer, Socket connectionSocket) {
+    public void received(ByteBuffer dataBuffer, SocketChannel connectionSocket) {
 
-        if (connectionSocket == feedbackSocket) {
+        if (connectionSocket == feedbackChannel) {
             dataBuffer.order( getByteOrder() );
 
             // Transfer the data into the feedback buffer and make it ready for reading.
@@ -802,5 +705,43 @@ public class APNClient implements NetworkConnectionStateListener, NetworkDataLis
             // Compact what we read out of the buffer.
             feedbackBuffer.compact();
         }
+    }
+
+    /**
+     * Close active connections to the Apple Push Notification server.
+     * 
+     * <p>
+     * <b>Note:</b> This does not close any possible connections to the Apple Push Notification Feedback service. This
+     * connection is expected to close automatically when Apple finished dumping its queue. Use
+     * {@link #closeFeedbackService()} if for some reason you want to do this anyway.
+     * </p>
+     */
+    public void closeAPNs() {
+
+        if (apnsChannel != null && apnsChannel.isOpen())
+            try {
+                network.close( apnsChannel );
+                apnsChannel = null;
+            }
+
+            catch (IOException e) {
+                logger.err( "While closing the Apple Push Notification server connection:", e );
+            }
+    }
+
+    /**
+     * Close any active connection to the Apple Push Notification Feedback service.
+     */
+    public void closeFeedbackService() {
+
+        if (feedbackChannel != null && feedbackChannel.isOpen())
+            try {
+                network.close( feedbackChannel );
+                feedbackChannel = null;
+            }
+
+            catch (IOException e) {
+                logger.err( "While closing the Apple Push Notification Feedback service connection:", e );
+            }
     }
 }

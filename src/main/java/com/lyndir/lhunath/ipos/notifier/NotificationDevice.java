@@ -77,6 +77,20 @@ public class NotificationDevice {
     }
 
     /**
+     * @return The token of this {@link NotificationDevice} as a string of hexadecimal characters.
+     */
+    public String getTokenStringHex() {
+
+        StringBuffer bytes = new StringBuffer();
+        Formatter formatter = new Formatter( bytes );
+
+        for (byte b : token)
+            formatter.format( "%02X", b );
+
+        return bytes.toString();
+    }
+
+    /**
      * This method generates a hexadecimal representation of the device token.
      * 
      * {@inheritDoc}
@@ -84,12 +98,6 @@ public class NotificationDevice {
     @Override
     public String toString() {
 
-        StringBuffer bytes = new StringBuffer( "[d: " );
-        Formatter formatter = new Formatter( bytes );
-
-        for (byte b : token)
-            formatter.format( "%02X", b );
-
-        return bytes.append( ']' ).toString();
+        return String.format( "[d: %s]", getTokenStringHex() );
     }
 }
