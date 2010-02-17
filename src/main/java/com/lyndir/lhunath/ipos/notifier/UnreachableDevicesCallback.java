@@ -18,10 +18,13 @@ package com.lyndir.lhunath.ipos.notifier;
 import java.util.Date;
 import java.util.Map;
 
+import com.lyndir.lhunath.ipos.notifier.data.NotificationDevice;
+import com.lyndir.lhunath.ipos.notifier.impl.APNClient;
+
 
 /**
- * <h2>{@link UninstalledDevicesCallback}<br>
- * <sub>Callback interface which is used to provide information about uninstalled applications.</sub></h2>
+ * <h2>{@link UnreachableDevicesCallback}<br>
+ * <sub>Callback interface which is used to provide information about devices that have become unreachable.</sub></h2>
  * 
  * <p>
  * <i>Jun 26, 2009</i>
@@ -29,16 +32,16 @@ import java.util.Map;
  * 
  * @author lhunath
  */
-public interface UninstalledDevicesCallback {
+public interface UnreachableDevicesCallback {
 
     /**
      * Invoked by {@link APNClient} in response to network events caused by the
-     * {@link APNClient#fetchUninstalledDevices(UninstalledDevicesCallback)}.
+     * {@link APNClient#fetchUnreachableDevices(UnreachableDevicesCallback)}.
      * 
      * <p>
-     * When the Apple Push Notification Feedback Service reports devices where the application has been uninstalled,
-     * these devices are collected in a {@link Map} along with the time at which Apple noticed the application had
-     * disappeared.
+     * When the Apple Push Notification Feedback Service reports devices that did not respond to recent push
+     * notifications directed at them, these devices are collected in a {@link Map} along with the time at which the
+     * Apple Push Notification server first noticed these devices having become unreachable.
      * </p>
      * 
      * <p>
@@ -48,14 +51,14 @@ public interface UninstalledDevicesCallback {
      * </p>
      * 
      * <p>
-     * This method is invoked as soon as the responsible connection to the Apple Push Notification Feedback Service ends
-     * (indicating Apple has finished sending us all of their data). It is invoked in a new thread (so, not the thread
-     * in which you performed {@link APNClient#fetchUninstalledDevices(UninstalledDevicesCallback)} and not the
-     * networking thread!).
+     * This method is invoked as soon as the connection to the Apple Push Notification Feedback Service ends (indicating
+     * Apple has finished sending us all of their data). Its execution runs in a new thread (so, not the thread in which
+     * you performed {@link APNClient#fetchUnreachableDevices(UnreachableDevicesCallback)} and not the networking
+     * thread!).
      * </p>
      * 
      * <p>
-     * After you've handled any events for one of the <code>uninstalledDevices</code>, you should remove it from this
+     * As soon as you've handled any of the entries in <code>uninstalledDevices</code> you should remove them from the
      * map so that any subsequent calls of this method provide current data.
      * </p>
      * 
@@ -67,9 +70,9 @@ public interface UninstalledDevicesCallback {
      * </p>
      * 
      * @param uninstalledDevices
-     *            The {@link Map} that is filled up from reported uninstalled devices. It maps the device on which the
-     *            application used to be installed to the date on which Apple determined the application was no longer
-     *            available.
+     *            The {@link Map} that contains the devices on which the application was unreachable. It maps the
+     *            notified device to the date on which Apple first determined the notified application to be
+     *            unreachable.
      */
-    public void detectedUninstalledDevices(Map<NotificationDevice, Date> uninstalledDevices);
+    public void foundUnreachableDevices(Map<NotificationDevice, Date> uninstalledDevices);
 }

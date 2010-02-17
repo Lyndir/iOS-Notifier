@@ -13,7 +13,7 @@
  *   See the License for the specific language governing permissions and
  *   limitations under the License.
  */
-package com.lyndir.lhunath.ipos.notifier;
+package com.lyndir.lhunath.ipos.notifier.impl;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -38,9 +38,9 @@ import com.lyndir.lhunath.lib.system.logging.Logger;
  * <p>
  * As soon as a notification arrives, a connection to the APNs is established by the {@link APNClient}. The
  * {@link APNQueue} then waits for more notifications to arrive and dispatches each over this existing connection. After
- * a configurable timeout (which defaults to {@value #timeout}) of not receiving any additional notifications, the
- * {@link APNQueue} shuts down {@link APNClient}'s connection to the APNs and waits for more notifications in silence.
- * When more arrive, this cycle begins anew.
+ * a configurable timeout (which defaults to {@value #DEFAULT_TIMEOUT} milliseconds) of not receiving any additional
+ * notifications, the {@link APNQueue} shuts down {@link APNClient} 's connection to the APNs and waits for more
+ * notifications in silence. When more arrive, this cycle begins anew.
  * </p>
  * 
  * <p>
@@ -51,9 +51,14 @@ import com.lyndir.lhunath.lib.system.logging.Logger;
  */
 public class APNQueue extends LinkedBlockingQueue<ByteBuffer> implements Runnable {
 
-    private static final Logger logger  = Logger.get( APNQueue.class );
+    private static final long   serialVersionUID = 1L;
 
-    private long                timeout = 10 * 1000 /* By default, wait 10s before closing the APNs link. */;
+    private static final Logger logger           = Logger.get( APNQueue.class );
+
+    protected static long       DEFAULT_TIMEOUT  = 10 * 1000 /* By default, wait 10s before closing the APNs link. */;
+
+    private long                timeout          = DEFAULT_TIMEOUT;
+    private boolean             running;
     private Thread              apnQueueThread;
     private APNClient           apnClient;
 
@@ -91,10 +96,11 @@ public class APNQueue extends LinkedBlockingQueue<ByteBuffer> implements Runnabl
      */
     public void run() {
 
+        running = true;
         Thread.currentThread().setName( "APN Dispatch Queue" );
         logger.inf( "APNQueue is running." );
 
-        while (true)
+        while (running)
             try {
                 ByteBuffer dataBuffer = take();
                 apnClient.dispatch( dataBuffer );
@@ -108,14 +114,16 @@ public class APNQueue extends LinkedBlockingQueue<ByteBuffer> implements Runnabl
             }
 
             catch (InterruptedException e) {
-                logger.wrn( "Operation was interrupted.", e );
+                logger.wrn( e, "Operation was interrupted." );
             } catch (IOException e) {
-                logger.wrn( "Network error while dispatching notifications.", e );
+                logger.wrn( e, "Network error while dispatching notifications." );
             } catch (KeyManagementException e) {
-                logger.err( "Could not initialize transport security: keys unavailable?", e );
+                logger.err( e, "Could not initialize transport security: keys unavailable?" );
             } catch (NoSuchAlgorithmException e) {
-                logger.bug( "Could not initialize transport security: keys algorithms unsupported?", e );
+                logger.bug( e, "Could not initialize transport security: keys algorithms unsupported?" );
             }
+
+        logger.inf( "APNQueue has been shut down." );
     }
 
     /**
@@ -131,5 +139,15 @@ public class APNQueue extends LinkedBlockingQueue<ByteBuffer> implements Runnabl
 
         apnQueueThread = new Thread( this );
         apnQueueThread.start();
+    }
+
+    /**
+     * Stop the Apple Push Notification Queue. This will cancel any pending notifications and shut down the queue
+     * processing thread.
+     */
+    public synchronized void stop() {
+
+        running = false;
+        apnQueueThread.interrupt();
     }
 }

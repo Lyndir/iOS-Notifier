@@ -13,7 +13,7 @@
  *   See the License for the specific language governing permissions and
  *   limitations under the License.
  */
-package com.lyndir.lhunath.ipos.notifier;
+package com.lyndir.lhunath.ipos.notifier.data;
 
 import net.sf.json.JSONString;
 import net.sf.json.util.JSONBuilder;
@@ -33,8 +33,9 @@ import net.sf.json.util.JSONStringer;
  * </p>
  * 
  * 
- * @see http://developer.apple.com/iphone/library/documentation/NetworkingInternet/Conceptual/RemoteNotificationsPG/
- *      ApplePushService/ApplePushService.html#//apple_ref/doc/uid/TP40008194-CH100-SW1
+ * @see <a
+ *      href="http://developer.apple.com/iphone/library/documentation/NetworkingInternet/Conceptual/RemoteNotificationsPG/ApplePushService/ApplePushService.html#//apple_ref/doc/uid/TP40008194-CH100-SW1">Apple
+ *      Push Notification Service Programming Guide: The Notification Payload</a>
  * 
  * @author lhunath
  */
@@ -130,8 +131,10 @@ public class NotificationPayLoad implements JSONString {
      * <i>Jun 23, 2009</i>
      * </p>
      * 
-     * @see http://developer.apple.com/iphone/library/documentation/NetworkingInternet/Conceptual/RemoteNotificationsPG/
-     *      ApplePushService/ApplePushService.html#//apple_ref/doc/uid/TP40008194-CH100-SW20
+     * @see <a
+     *      href="http://developer.apple.com/iphone/library/documentation/NetworkingInternet/Conceptual/RemoteNotificationsPG/ApplePushService/ApplePushService.html#//apple_ref/doc/uid/TP40008194-CH100-SW20">Apple
+     *      Push Notification Service Programming Guide: The Notification Payload: Table 2-2 Child properties of the
+     *      alert property</a>
      * 
      * @author lhunath
      */
@@ -202,7 +205,8 @@ public class NotificationPayLoad implements JSONString {
         /**
          * @param locArgs
          *            The arguments that expand the format specifiers in the localization value referenced by
-         *            {@link #getLocKey()}.
+         *            {@link #getLocKey()}. See {@link JSONBuilder#value(Object)} for a reference of the types allowed
+         *            for this argument's value.
          */
         public void setLocArgs(Object... locArgs) {
 
@@ -294,7 +298,6 @@ public class NotificationPayLoad implements JSONString {
             if (alert.getBody() != null && alert.getActionLocKey() == null && alert.getLocKey() == null)
                 // Alert message has only a body.
                 jsonStringer.key( "alert" ).value( alert.getBody() );
-
             else {
                 // Alert message has either no body or also other keys.
                 jsonStringer.key( "alert" ).object();

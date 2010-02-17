@@ -13,9 +13,11 @@
  *   See the License for the specific language governing permissions and
  *   limitations under the License.
  */
-package com.lyndir.lhunath.ipos.notifier;
+package com.lyndir.lhunath.ipos.notifier.data;
 
 import java.util.Formatter;
+
+import com.lyndir.lhunath.lib.system.logging.Logger;
 
 
 /**
@@ -30,7 +32,9 @@ import java.util.Formatter;
  */
 public class NotificationDevice {
 
-    private byte[] token;
+    private static final Logger logger = Logger.get( NotificationDevice.class );
+
+    private byte[]              token;
 
 
     /**
@@ -41,29 +45,37 @@ public class NotificationDevice {
      */
     public NotificationDevice(byte[] token) {
 
+        if (token.length != 32)
+            throw logger.err( "Device token should be 32 bytes long; was %d.", //
+                    token.length ).toError( IllegalArgumentException.class );
+
         this.token = token;
     }
 
     /**
      * Create a new {@link NotificationDevice} instance.
      * 
-     * @param deviceTokenHex
+     * @param hexDeviceToken
      *            The device's trust token as a string of hexadecimal characters. This token will identify the
      *            destination device.
      */
-    public NotificationDevice(String deviceTokenHex) {
+    public NotificationDevice(String hexDeviceToken) {
 
-        this( deviceTokenHexToBytes( deviceTokenHex ) );
+        this( deviceTokenHexToBytes( hexDeviceToken ) );
     }
 
     /**
      * Convert a string of hexadecimal characters into a binary device token.
      */
-    private static byte[] deviceTokenHexToBytes(String deviceTokenHex) {
+    private static byte[] deviceTokenHexToBytes(String hexDeviceToken) {
 
-        byte[] deviceToken = new byte[deviceTokenHex.length() / 2];
-        for (int i = 0; i < deviceTokenHex.length(); i += 2)
-            deviceToken[i / 2] = Integer.valueOf( deviceTokenHex.substring( i, i + 2 ), 16 ).byteValue();
+        if (hexDeviceToken.length() != 64)
+            throw logger.err( "Device token (%s) should be 64 hexadecimal characters long; was %d.", //
+                    hexDeviceToken, hexDeviceToken.length() ).toError( IllegalArgumentException.class );
+
+        byte[] deviceToken = new byte[hexDeviceToken.length() / 2];
+        for (int i = 0; i < hexDeviceToken.length(); i += 2)
+            deviceToken[i / 2] = Integer.valueOf( hexDeviceToken.substring( i, i + 2 ), 16 ).byteValue();
 
         return deviceToken;
     }
@@ -79,7 +91,7 @@ public class NotificationDevice {
     /**
      * @return The token of this {@link NotificationDevice} as a string of hexadecimal characters.
      */
-    public String getTokenStringHex() {
+    public String getTokenHexString() {
 
         StringBuffer bytes = new StringBuffer();
         Formatter formatter = new Formatter( bytes );
@@ -98,6 +110,6 @@ public class NotificationDevice {
     @Override
     public String toString() {
 
-        return String.format( "[d: %s]", getTokenStringHex() );
+        return String.format( "[d: %s]", getTokenHexString() );
     }
 }

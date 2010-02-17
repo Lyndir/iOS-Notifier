@@ -13,7 +13,7 @@
  *   See the License for the specific language governing permissions and
  *   limitations under the License.
  */
-package com.lyndir.lhunath.ipos.notifier;
+package com.lyndir.lhunath.ipos.notifier.data;
 
 import java.net.InetSocketAddress;
 
@@ -84,10 +84,10 @@ public class APNServerConfig {
      *            The SSL/TLS protocol to use for transport encryption to these servers.
      */
     public APNServerConfig(String apnsHostname, int apnsPort, String feedBackHostname, int feedBackPort,
-            String encryptionProtocol) {
+                           String encryptionProtocol) {
 
         this( new InetSocketAddress( apnsHostname, apnsPort ), new InetSocketAddress( feedBackHostname, feedBackPort ),
-              encryptionProtocol );
+                encryptionProtocol );
     }
 
     /**
