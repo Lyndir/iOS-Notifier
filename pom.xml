@@ -12,7 +12,7 @@
 
     <groupId>com.lyndir.lhunath.ipos-notifier</groupId>
     <artifactId>ipos-notifier</artifactId>
-    <version>1.0</version>
+    <version>SNAPSHOT</version>
     <packaging>jar</packaging>
 
     <name>ipOS Notifier</name>
