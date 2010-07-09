@@ -8,11 +8,12 @@
     <parent>
         <groupId>com.lyndir.lhunath</groupId>
         <artifactId>lyndir</artifactId>
-        <version>SNAPSHOT</version>
+        <version>1.2</version>
     </parent>
 
     <groupId>com.lyndir.lhunath.ipos-notifier</groupId>
     <artifactId>ipos-notifier</artifactId>
+    <version>SNAPSHOT</version>
     <packaging>jar</packaging>
 
     <name>ipOS Notifier</name>
@@ -48,16 +49,19 @@
     </developers>
 
 
-    <!-- CODE MANAGEMENT -->
+    <!-- CODE ACCESS -->
     <scm>
-        <url>http://github.com/lhunath/ipOS-Notifier</url>
-        <connection>git://github.com/lhunath/ipOS-Notifier.git</connection>
-        <developerConnection>ssh://git@github.com:lhunath/ipOS-Notifier.git</developerConnection>
+        <url>http://codaset.com/lhunath/ipos-notifier</url>
+        <connection>${scm.git.pubbase}/ipos-notifier.git</connection>
+        <developerConnection>${scm.git.devbase}/ipos-notifier.git</developerConnection>
     </scm>
 
 
+
     <!-- DEFAULT PROPERTIES -->
-    <properties></properties>
+    <properties>
+        <release.version>1.0</release.version>
+    </properties>
 
     <!-- BUILD CONFIGURATION -->
     <build></build>
