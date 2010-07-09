@@ -15,49 +15,42 @@
  */
 package com.lyndir.lhunath.ipos.notifier.data;
 
-import java.util.Formatter;
-
 import com.lyndir.lhunath.lib.system.logging.Logger;
+import java.util.Formatter;
 
 
 /**
- * <h2>{@link NotificationDevice}<br>
- * <sub>An iPhone OS device that can receive APNs notifications.</sub></h2>
- * 
- * <p>
- * <i>Jun 23, 2009</i>
- * </p>
- * 
+ * <h2>{@link NotificationDevice}<br> <sub>An iPhone OS device that can receive APNs notifications.</sub></h2>
+ *
+ * <p> <i>Jun 23, 2009</i> </p>
+ *
  * @author lhunath
  */
 public class NotificationDevice {
 
     private static final Logger logger = Logger.get( NotificationDevice.class );
 
-    private byte[]              token;
-
+    private byte[] token;
 
     /**
      * Create a new {@link NotificationDevice} instance.
-     * 
-     * @param token
-     *            The device's trust token. This token will identify the destination device.
+     *
+     * @param token The device's trust token. This token will identify the destination device.
      */
     public NotificationDevice(byte[] token) {
 
         if (token.length != 32)
             throw logger.err( "Device token should be 32 bytes long; was %d.", //
-                    token.length ).toError( IllegalArgumentException.class );
+                              token.length ).toError( IllegalArgumentException.class );
 
         this.token = token;
     }
 
     /**
      * Create a new {@link NotificationDevice} instance.
-     * 
-     * @param hexDeviceToken
-     *            The device's trust token as a string of hexadecimal characters. This token will identify the
-     *            destination device.
+     *
+     * @param hexDeviceToken The device's trust token as a string of hexadecimal characters. This token will identify the destination
+     *                       device.
      */
     public NotificationDevice(String hexDeviceToken) {
 
@@ -71,7 +64,7 @@ public class NotificationDevice {
 
         if (hexDeviceToken.length() != 64)
             throw logger.err( "Device token (%s) should be 64 hexadecimal characters long; was %d.", //
-                    hexDeviceToken, hexDeviceToken.length() ).toError( IllegalArgumentException.class );
+                              hexDeviceToken, hexDeviceToken.length() ).toError( IllegalArgumentException.class );
 
         byte[] deviceToken = new byte[hexDeviceToken.length() / 2];
         for (int i = 0; i < hexDeviceToken.length(); i += 2)
@@ -104,7 +97,7 @@ public class NotificationDevice {
 
     /**
      * This method generates a hexadecimal representation of the device token.
-     * 
+     *
      * {@inheritDoc}
      */
     @Override

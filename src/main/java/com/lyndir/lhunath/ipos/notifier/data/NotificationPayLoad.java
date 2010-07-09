@@ -21,32 +21,22 @@ import net.sf.json.util.JSONStringer;
 
 
 /**
- * <h2>{@link NotificationPayLoad}<br>
- * <sub>The payload for an APNs notification message.</sub></h2>
- * 
- * <p>
- * The payload describes the parameters for the actual notification. This involves whether to display an alert message,
- * whether to set a badge on the application icon or whether to play a sound.
- * </p>
- * <p>
- * <i>Jun 23, 2009</i>
- * </p>
- * 
- * 
- * @see <a
- *      href="http://developer.apple.com/iphone/library/documentation/NetworkingInternet/Conceptual/RemoteNotificationsPG/ApplePushService/ApplePushService.html#//apple_ref/doc/uid/TP40008194-CH100-SW1">Apple
- *      Push Notification Service Programming Guide: The Notification Payload</a>
- * 
+ * <h2>{@link NotificationPayLoad}<br> <sub>The payload for an APNs notification message.</sub></h2>
+ *
+ * <p> The payload describes the parameters for the actual notification. This involves whether to display an alert message, whether to set a
+ * badge on the application icon or whether to play a sound. </p> <p> <i>Jun 23, 2009</i> </p>
+ *
  * @author lhunath
+ * @see <a href="http://developer.apple.com/iphone/library/documentation/NetworkingInternet/Conceptual/RemoteNotificationsPG/ApplePushService/ApplePushService.html#//apple_ref/doc/uid/TP40008194-CH100-SW1">Apple
+ *      Push Notification Service Programming Guide: The Notification Payload</a>
  */
 public class NotificationPayLoad implements JSONString {
 
     /**
      * Create a payload for sending a notification that shows an alert message with a static body.
-     * 
-     * @param alertBody
-     *            The static string to show in the alert message.
-     * 
+     *
+     * @param alertBody The static string to show in the alert message.
+     *
      * @return A notification payload with just an alert that has just a body and a single button.
      */
     public static NotificationPayLoad createSimpleAlert(String alertBody) {
@@ -62,13 +52,11 @@ public class NotificationPayLoad implements JSONString {
 
     /**
      * Create a payload for sending a notification that shows an alert message with a localized body.
-     * 
-     * @param alertBodyKey
-     *            The localization key (from the application's <code>Localizable.strings</code>) that maps this alert
-     *            message's body.
-     * @param alertBodyArgs
-     *            The arguments to use for expanding format specifiers in the mapped alert message's body.
-     * 
+     *
+     * @param alertBodyKey  The localization key (from the application's <code>Localizable.strings</code>) that maps this alert message's
+     *                      body.
+     * @param alertBodyArgs The arguments to use for expanding format specifiers in the mapped alert message's body.
+     *
      * @return A notification payload with just an alert that has just a body and a single button.
      */
     public static NotificationPayLoad createLocalizedAlert(String alertBodyKey, Object... alertBodyArgs) {
@@ -85,10 +73,9 @@ public class NotificationPayLoad implements JSONString {
 
     /**
      * Create a payload for sending a notification that causes a sound effect to be played on the destination device.
-     * 
-     * @param soundPath
-     *            The application's bundle path to the sound file that contains the sound effect that should be played.
-     * 
+     *
+     * @param soundPath The application's bundle path to the sound file that contains the sound effect that should be played.
+     *
      * @return A notification payload which just plays a sound effect.
      */
     public static NotificationPayLoad createSound(String soundPath) {
@@ -102,10 +89,9 @@ public class NotificationPayLoad implements JSONString {
 
     /**
      * Create a payload for sending a notification that sets the application's badge count.
-     * 
-     * @param badgeCount
-     *            The count to display in the application icon's badge on the user's home screen.
-     * 
+     *
+     * @param badgeCount The count to display in the application icon's badge on the user's home screen.
+     *
      * @return A notification payload which just sets the application's badge count.
      */
     public static NotificationPayLoad createBadge(Integer badgeCount) {
@@ -117,38 +103,27 @@ public class NotificationPayLoad implements JSONString {
         return notificationPayLoad;
     }
 
-
     /**
-     * <h2>{@link Alert}<br>
-     * <sub>An alert message to display as a result of an APNs notification.</sub></h2>
-     * 
-     * <p>
-     * Alert messages can contain just a body or they can specify localization keys as defined in the destination
-     * application's <code>Localizable.strings</code>.
-     * </p>
-     * 
-     * <p>
-     * <i>Jun 23, 2009</i>
-     * </p>
-     * 
-     * @see <a
-     *      href="http://developer.apple.com/iphone/library/documentation/NetworkingInternet/Conceptual/RemoteNotificationsPG/ApplePushService/ApplePushService.html#//apple_ref/doc/uid/TP40008194-CH100-SW20">Apple
-     *      Push Notification Service Programming Guide: The Notification Payload: Table 2-2 Child properties of the
-     *      alert property</a>
-     * 
+     * <h2>{@link Alert}<br> <sub>An alert message to display as a result of an APNs notification.</sub></h2>
+     *
+     * <p> Alert messages can contain just a body or they can specify localization keys as defined in the destination application's
+     * <code>Localizable.strings</code>. </p>
+     *
+     * <p> <i>Jun 23, 2009</i> </p>
+     *
      * @author lhunath
+     * @see <a href="http://developer.apple.com/iphone/library/documentation/NetworkingInternet/Conceptual/RemoteNotificationsPG/ApplePushService/ApplePushService.html#//apple_ref/doc/uid/TP40008194-CH100-SW20">Apple
+     *      Push Notification Service Programming Guide: The Notification Payload: Table 2-2 Child properties of the alert property</a>
      */
     public static class Alert {
 
-        private String   body;
-        private String   actionLocKey;
-        private String   locKey;
+        private String body;
+        private String actionLocKey;
+        private String locKey;
         private Object[] locArgs;
 
-
         /**
-         * @param body
-         *            A static, non-localized message to display in the alert message.
+         * @param body A static, non-localized message to display in the alert message.
          */
         public void setBody(String body) {
 
@@ -164,9 +139,8 @@ public class NotificationPayLoad implements JSONString {
         }
 
         /**
-         * @param actionLocKey
-         *            The localization key for the action button in the alert message that opens the application when
-         *            tapped. When <code>null</code> only one button is shown that dismisses the notification.
+         * @param actionLocKey The localization key for the action button in the alert message that opens the application when tapped. When
+         *                     <code>null</code> only one button is shown that dismisses the notification.
          */
         public void setActionLocKey(String actionLocKey) {
 
@@ -174,8 +148,8 @@ public class NotificationPayLoad implements JSONString {
         }
 
         /**
-         * @return The localization key for the action button in the alert message that opens the application when
-         *         tapped. When <code>null</code> only one button is shown that dismisses the notification.
+         * @return The localization key for the action button in the alert message that opens the application when tapped. When
+         *         <code>null</code> only one button is shown that dismisses the notification.
          */
         public String getActionLocKey() {
 
@@ -183,11 +157,9 @@ public class NotificationPayLoad implements JSONString {
         }
 
         /**
-         * @param locKey
-         *            The localization key for the body message to display in this alert message. Use this instead of
-         *            {@link #setBody(String)} if you want to display a localizable alert message. The localization
-         *            value can contain format specifiers which will be expanded from the values in
-         *            {@link #getLocArgs()}.
+         * @param locKey The localization key for the body message to display in this alert message. Use this instead of {@link
+         *               #setBody(String)} if you want to display a localizable alert message. The localization value can contain format
+         *               specifiers which will be expanded from the values in {@link #getLocArgs()}.
          */
         public void setLocKey(String locKey) {
 
@@ -203,10 +175,8 @@ public class NotificationPayLoad implements JSONString {
         }
 
         /**
-         * @param locArgs
-         *            The arguments that expand the format specifiers in the localization value referenced by
-         *            {@link #getLocKey()}. See {@link JSONBuilder#value(Object)} for a reference of the types allowed
-         *            for this argument's value.
+         * @param locArgs The arguments that expand the format specifiers in the localization value referenced by {@link #getLocKey()}. See
+         *                {@link JSONBuilder#value(Object)} for a reference of the types allowed for this argument's value.
          */
         public void setLocArgs(Object... locArgs) {
 
@@ -214,8 +184,7 @@ public class NotificationPayLoad implements JSONString {
         }
 
         /**
-         * @return The arguments that expand the format specifiers in the localization value referenced by
-         *         {@link #getLocKey()}.
+         * @return The arguments that expand the format specifiers in the localization value referenced by {@link #getLocKey()}.
          */
         public Object[] getLocArgs() {
 
@@ -224,15 +193,13 @@ public class NotificationPayLoad implements JSONString {
     }
 
 
-    private Alert   alert;
+    private Alert alert;
     private Integer badge;
-    private String  sound;
-
+    private String sound;
 
     /**
-     * @param alert
-     *            The alert message to display as a result of this notification or <code>null</code> if no alert message
-     *            should be displayed.
+     * @param alert The alert message to display as a result of this notification or <code>null</code> if no alert message should be
+     *              displayed.
      */
     public void setAlert(Alert alert) {
 
@@ -240,8 +207,7 @@ public class NotificationPayLoad implements JSONString {
     }
 
     /**
-     * @return The alert message to display as a result of this notification or <code>null</code> if no alert message
-     *         should be displayed.
+     * @return The alert message to display as a result of this notification or <code>null</code> if no alert message should be displayed.
      */
     public Alert getAlert() {
 
@@ -249,9 +215,7 @@ public class NotificationPayLoad implements JSONString {
     }
 
     /**
-     * @param badge
-     *            The number to display on the application's badge or <code>null</code> if this notification should
-     *            remove the badge.
+     * @param badge The number to display on the application's badge or <code>null</code> if this notification should remove the badge.
      */
     public void setBadge(Integer badge) {
 
@@ -259,8 +223,7 @@ public class NotificationPayLoad implements JSONString {
     }
 
     /**
-     * @return The number to display on the application's badge or <code>null</code> if this notification should remove
-     *         the badge.
+     * @return The number to display on the application's badge or <code>null</code> if this notification should remove the badge.
      */
     public Integer getBadge() {
 
@@ -268,9 +231,8 @@ public class NotificationPayLoad implements JSONString {
     }
 
     /**
-     * @param sound
-     *            The application bundle path of the sound file to play for this notification or <code>null</code> if
-     *            this notification doesn't play a sound.
+     * @param sound The application bundle path of the sound file to play for this notification or <code>null</code> if this notification
+     *              doesn't play a sound.
      */
     public void setSound(String sound) {
 
@@ -278,8 +240,8 @@ public class NotificationPayLoad implements JSONString {
     }
 
     /**
-     * @return The application bundle path of the sound file to play for this notification or <code>null</code> if this
-     *         notification doesn't play a sound.
+     * @return The application bundle path of the sound file to play for this notification or <code>null</code> if this notification doesn't
+     *         play a sound.
      */
     public String getSound() {
 

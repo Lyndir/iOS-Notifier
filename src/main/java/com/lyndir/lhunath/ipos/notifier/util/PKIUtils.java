@@ -19,7 +19,6 @@ import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.UnrecoverableKeyException;
-
 import javax.net.ssl.KeyManager;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.TrustManager;
@@ -27,39 +26,29 @@ import javax.net.ssl.TrustManagerFactory;
 
 
 /**
- * <h2>{@link PKIUtils}<br>
- * <sub>Public Key Infrastructure Utilities.</sub></h2>
- * 
- * <p>
- * <i>Nov 20, 2009</i>
- * </p>
- * 
+ * <h2>{@link PKIUtils}<br> <sub>Public Key Infrastructure Utilities.</sub></h2>
+ *
+ * <p> <i>Nov 20, 2009</i> </p>
+ *
  * @author lhunath
  */
 public abstract class PKIUtils {
 
     /**
      * Creates the factory for {@link KeyManager}s which provide the client identity.
-     * 
-     * <p>
-     * Uses private key entries in the given <code>keyStore</code> and unlocks them with the given
-     * <code>privateKeyPassword</code>.
+     *
+     * <p> Uses private key entries in the given <code>keyStore</code> and unlocks them with the given <code>privateKeyPassword</code>.
      * </p>
-     * 
-     * @param keyStore
-     *            The {@link KeyStore} that provides the private key(s).
-     * @param privateKeyPassword
-     *            The password that protects the private key data.
-     * 
+     *
+     * @param keyStore           The {@link KeyStore} that provides the private key(s).
+     * @param privateKeyPassword The password that protects the private key data.
+     *
      * @return A {@link KeyManagerFactory}.
-     * 
-     * @throws NoSuchAlgorithmException
-     *             The key's algorithm is not supported by the default key manager's provider.
-     * @throws UnrecoverableKeyException
-     *             The private key could not be accessed from the <code>keyStore</code>. Perhaps the provided
-     *             <code>privateKeyPassword</code> is incorrect.
-     * @throws KeyStoreException
-     *             The <code>keyStore</code> has not been properly loaded/initialized or is corrupt.
+     *
+     * @throws NoSuchAlgorithmException  The key's algorithm is not supported by the default key manager's provider.
+     * @throws UnrecoverableKeyException The private key could not be accessed from the <code>keyStore</code>. Perhaps the provided
+     *                                   <code>privateKeyPassword</code> is incorrect.
+     * @throws KeyStoreException         The <code>keyStore</code> has not been properly loaded/initialized or is corrupt.
      */
     public static KeyManagerFactory createKeyManagerFactory(KeyStore keyStore, String privateKeyPassword)
             throws NoSuchAlgorithmException, UnrecoverableKeyException, KeyStoreException {
@@ -72,21 +61,16 @@ public abstract class PKIUtils {
 
     /**
      * Creates the factory for {@link TrustManager}s.
-     * 
-     * <p>
-     * The factory will provide simple trust for each trusted certificate in the given <code>keyStore</code>.<br>
-     * No additional optional PKIX validation is performed on the trust path.
-     * </p>
-     * 
-     * @param keyStore
-     *            The {@link KeyStore} that provides the certificates of the trusted Certificate Authorities.
-     * 
+     *
+     * <p> The factory will provide simple trust for each trusted certificate in the given <code>keyStore</code>.<br> No additional optional
+     * PKIX validation is performed on the trust path. </p>
+     *
+     * @param keyStore The {@link KeyStore} that provides the certificates of the trusted Certificate Authorities.
+     *
      * @return A {@link TrustManagerFactory}.
-     * 
-     * @throws NoSuchAlgorithmException
-     *             The default trust algorithm is unavailable (see {@link TrustManagerFactory#getDefaultAlgorithm()})
-     * @throws KeyStoreException
-     *             The <code>keyStore</code> has not been properly loaded/initialized or is corrupt.
+     *
+     * @throws NoSuchAlgorithmException The default trust algorithm is unavailable (see {@link TrustManagerFactory#getDefaultAlgorithm()})
+     * @throws KeyStoreException        The <code>keyStore</code> has not been properly loaded/initialized or is corrupt.
      */
     public static TrustManagerFactory createTrustManagerFactory(KeyStore keyStore)
             throws NoSuchAlgorithmException, KeyStoreException {

@@ -15,6 +15,7 @@
  */
 package com.lyndir.lhunath.ipos.notifier.impl;
 
+import com.lyndir.lhunath.lib.system.logging.Logger;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.security.KeyManagementException;
@@ -22,52 +23,39 @@ import java.security.NoSuchAlgorithmException;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
-import com.lyndir.lhunath.lib.system.logging.Logger;
-
 
 /**
- * <h2>{@link APNQueue}<br>
- * <sub>A queue which manages dispatching of notifications to the APNs.</sub></h2>
- * 
- * <p>
- * This queue collects notifications and dispatches them to the Apple Push Notification server using an
- * {@link APNClient}. It is designed to gather multiple notifications and dispatch them on the same connection to the
- * APNs.
- * </p>
- * 
- * <p>
- * As soon as a notification arrives, a connection to the APNs is established by the {@link APNClient}. The
- * {@link APNQueue} then waits for more notifications to arrive and dispatches each over this existing connection. After
- * a configurable timeout (which defaults to {@value #DEFAULT_TIMEOUT} milliseconds) of not receiving any additional
- * notifications, the {@link APNQueue} shuts down {@link APNClient} 's connection to the APNs and waits for more
- * notifications in silence. When more arrive, this cycle begins anew.
- * </p>
- * 
- * <p>
- * <i>Jun 30, 2009</i>
- * </p>
- * 
+ * <h2>{@link APNQueue}<br> <sub>A queue which manages dispatching of notifications to the APNs.</sub></h2>
+ *
+ * <p> This queue collects notifications and dispatches them to the Apple Push Notification server using an {@link APNClient}. It is
+ * designed to gather multiple notifications and dispatch them on the same connection to the APNs. </p>
+ *
+ * <p> As soon as a notification arrives, a connection to the APNs is established by the {@link APNClient}. The {@link APNQueue} then waits
+ * for more notifications to arrive and dispatches each over this existing connection. After a configurable timeout (which defaults to
+ * {@value #DEFAULT_TIMEOUT} milliseconds) of not receiving any additional notifications, the {@link APNQueue} shuts down {@link APNClient}
+ * 's connection to the APNs and waits for more notifications in silence. When more arrive, this cycle begins anew. </p>
+ *
+ * <p> <i>Jun 30, 2009</i> </p>
+ *
  * @author lhunath
  */
 public class APNQueue extends LinkedBlockingQueue<ByteBuffer> implements Runnable {
 
-    private static final long   serialVersionUID = 1L;
+    private static final long serialVersionUID = 1L;
 
-    private static final Logger logger           = Logger.get( APNQueue.class );
+    private static final Logger logger = Logger.get( APNQueue.class );
 
-    protected static long       DEFAULT_TIMEOUT  = 10 * 1000 /* By default, wait 10s before closing the APNs link. */;
+    protected static long DEFAULT_TIMEOUT = 10 * 1000 /* By default, wait 10s before closing the APNs link. */;
 
-    private long                timeout          = DEFAULT_TIMEOUT;
-    private boolean             running;
-    private Thread              apnQueueThread;
-    private APNClient           apnClient;
-
+    private long timeout = DEFAULT_TIMEOUT;
+    private boolean running;
+    private Thread apnQueueThread;
+    private APNClient apnClient;
 
     /**
      * Create a new {@link APNQueue} instance.
-     * 
-     * @param apnClient
-     *            The Apple Push Notification client interface for sending the queued notifications with.
+     *
+     * @param apnClient The Apple Push Notification client interface for sending the queued notifications with.
      */
     public APNQueue(APNClient apnClient) {
 
@@ -83,8 +71,7 @@ public class APNQueue extends LinkedBlockingQueue<ByteBuffer> implements Runnabl
     }
 
     /**
-     * @param timeout
-     *            The amount of milliseconds after which the connection to the APNs is shut down.
+     * @param timeout The amount of milliseconds after which the connection to the APNs is shut down.
      */
     public void setTimeout(long timeout) {
 
@@ -115,11 +102,14 @@ public class APNQueue extends LinkedBlockingQueue<ByteBuffer> implements Runnabl
 
             catch (InterruptedException e) {
                 logger.wrn( e, "Operation was interrupted." );
-            } catch (IOException e) {
+            }
+            catch (IOException e) {
                 logger.wrn( e, "Network error while dispatching notifications." );
-            } catch (KeyManagementException e) {
+            }
+            catch (KeyManagementException e) {
                 logger.err( e, "Could not initialize transport security: keys unavailable?" );
-            } catch (NoSuchAlgorithmException e) {
+            }
+            catch (NoSuchAlgorithmException e) {
                 logger.bug( e, "Could not initialize transport security: keys algorithms unsupported?" );
             }
 
@@ -127,8 +117,8 @@ public class APNQueue extends LinkedBlockingQueue<ByteBuffer> implements Runnabl
     }
 
     /**
-     * Start the Apple Push Notification Queue so that it will start processing queued buffers and dispatching them to
-     * the {@link APNClient} for submission.
+     * Start the Apple Push Notification Queue so that it will start processing queued buffers and dispatching them to the {@link APNClient}
+     * for submission.
      */
     public synchronized void start() {
 
@@ -142,8 +132,7 @@ public class APNQueue extends LinkedBlockingQueue<ByteBuffer> implements Runnabl
     }
 
     /**
-     * Stop the Apple Push Notification Queue. This will cancel any pending notifications and shut down the queue
-     * processing thread.
+     * Stop the Apple Push Notification Queue. This will cancel any pending notifications and shut down the queue processing thread.
      */
     public synchronized void stop() {
 
