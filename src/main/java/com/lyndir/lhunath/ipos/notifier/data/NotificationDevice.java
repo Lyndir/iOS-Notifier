@@ -37,7 +37,7 @@ public class NotificationDevice {
      *
      * @param token The device's trust token. This token will identify the destination device.
      */
-    public NotificationDevice(byte[] token) {
+    public NotificationDevice(final byte[] token) {
 
         if (token.length != 32)
             throw logger.err( "Device token should be 32 bytes long; was %d.", //
@@ -52,15 +52,17 @@ public class NotificationDevice {
      * @param hexDeviceToken The device's trust token as a string of hexadecimal characters. This token will identify the destination
      *                       device.
      */
-    public NotificationDevice(String hexDeviceToken) {
+    public NotificationDevice(final String hexDeviceToken) {
 
         this( deviceTokenHexToBytes( hexDeviceToken ) );
     }
 
     /**
-     * Convert a string of hexadecimal characters into a binary device token.
+     * @param hexDeviceToken A string of hexadecimal digits that represents a device token.
+     *
+     * @return A binary representation of the device token.
      */
-    private static byte[] deviceTokenHexToBytes(String hexDeviceToken) {
+    private static byte[] deviceTokenHexToBytes(final String hexDeviceToken) {
 
         if (hexDeviceToken.length() != 64)
             throw logger.err( "Device token (%s) should be 64 hexadecimal characters long; was %d.", //
@@ -89,7 +91,7 @@ public class NotificationDevice {
         StringBuffer bytes = new StringBuffer();
         Formatter formatter = new Formatter( bytes );
 
-        for (byte b : token)
+        for (final byte b : token)
             formatter.format( "%02X", b );
 
         return bytes.toString();

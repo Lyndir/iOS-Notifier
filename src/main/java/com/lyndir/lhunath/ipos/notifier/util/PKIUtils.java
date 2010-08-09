@@ -50,7 +50,7 @@ public abstract class PKIUtils {
      *                                   <code>privateKeyPassword</code> is incorrect.
      * @throws KeyStoreException         The <code>keyStore</code> has not been properly loaded/initialized or is corrupt.
      */
-    public static KeyManagerFactory createKeyManagerFactory(KeyStore keyStore, String privateKeyPassword)
+    public static KeyManagerFactory createKeyManagerFactory(final KeyStore keyStore, final String privateKeyPassword)
             throws NoSuchAlgorithmException, UnrecoverableKeyException, KeyStoreException {
 
         KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance( KeyManagerFactory.getDefaultAlgorithm() );
@@ -72,7 +72,7 @@ public abstract class PKIUtils {
      * @throws NoSuchAlgorithmException The default trust algorithm is unavailable (see {@link TrustManagerFactory#getDefaultAlgorithm()})
      * @throws KeyStoreException        The <code>keyStore</code> has not been properly loaded/initialized or is corrupt.
      */
-    public static TrustManagerFactory createTrustManagerFactory(KeyStore keyStore)
+    public static TrustManagerFactory createTrustManagerFactory(final KeyStore keyStore)
             throws NoSuchAlgorithmException, KeyStoreException {
 
         TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance( TrustManagerFactory.getDefaultAlgorithm() );

@@ -39,7 +39,7 @@ public class NotificationPayLoad implements JSONString {
      *
      * @return A notification payload with just an alert that has just a body and a single button.
      */
-    public static NotificationPayLoad createSimpleAlert(String alertBody) {
+    public static NotificationPayLoad createSimpleAlert(final String alertBody) {
 
         NotificationPayLoad notificationPayLoad = new NotificationPayLoad();
         Alert alert = new Alert();
@@ -59,7 +59,7 @@ public class NotificationPayLoad implements JSONString {
      *
      * @return A notification payload with just an alert that has just a body and a single button.
      */
-    public static NotificationPayLoad createLocalizedAlert(String alertBodyKey, Object... alertBodyArgs) {
+    public static NotificationPayLoad createLocalizedAlert(final String alertBodyKey, final Object... alertBodyArgs) {
 
         NotificationPayLoad notificationPayLoad = new NotificationPayLoad();
         Alert alert = new Alert();
@@ -78,7 +78,7 @@ public class NotificationPayLoad implements JSONString {
      *
      * @return A notification payload which just plays a sound effect.
      */
-    public static NotificationPayLoad createSound(String soundPath) {
+    public static NotificationPayLoad createSound(final String soundPath) {
 
         NotificationPayLoad notificationPayLoad = new NotificationPayLoad();
 
@@ -94,7 +94,7 @@ public class NotificationPayLoad implements JSONString {
      *
      * @return A notification payload which just sets the application's badge count.
      */
-    public static NotificationPayLoad createBadge(Integer badgeCount) {
+    public static NotificationPayLoad createBadge(final Integer badgeCount) {
 
         NotificationPayLoad notificationPayLoad = new NotificationPayLoad();
 
@@ -125,7 +125,7 @@ public class NotificationPayLoad implements JSONString {
         /**
          * @param body A static, non-localized message to display in the alert message.
          */
-        public void setBody(String body) {
+        public void setBody(final String body) {
 
             this.body = body;
         }
@@ -142,7 +142,7 @@ public class NotificationPayLoad implements JSONString {
          * @param actionLocKey The localization key for the action button in the alert message that opens the application when tapped. When
          *                     <code>null</code> only one button is shown that dismisses the notification.
          */
-        public void setActionLocKey(String actionLocKey) {
+        public void setActionLocKey(final String actionLocKey) {
 
             this.actionLocKey = actionLocKey;
         }
@@ -161,7 +161,7 @@ public class NotificationPayLoad implements JSONString {
          *               #setBody(String)} if you want to display a localizable alert message. The localization value can contain format
          *               specifiers which will be expanded from the values in {@link #getLocArgs()}.
          */
-        public void setLocKey(String locKey) {
+        public void setLocKey(final String locKey) {
 
             this.locKey = locKey;
         }
@@ -178,7 +178,7 @@ public class NotificationPayLoad implements JSONString {
          * @param locArgs The arguments that expand the format specifiers in the localization value referenced by {@link #getLocKey()}. See
          *                {@link JSONBuilder#value(Object)} for a reference of the types allowed for this argument's value.
          */
-        public void setLocArgs(Object... locArgs) {
+        public void setLocArgs(final Object... locArgs) {
 
             this.locArgs = locArgs;
         }
@@ -201,7 +201,7 @@ public class NotificationPayLoad implements JSONString {
      * @param alert The alert message to display as a result of this notification or <code>null</code> if no alert message should be
      *              displayed.
      */
-    public void setAlert(Alert alert) {
+    public void setAlert(final Alert alert) {
 
         this.alert = alert;
     }
@@ -217,7 +217,7 @@ public class NotificationPayLoad implements JSONString {
     /**
      * @param badge The number to display on the application's badge or <code>null</code> if this notification should remove the badge.
      */
-    public void setBadge(Integer badge) {
+    public void setBadge(final Integer badge) {
 
         this.badge = badge;
     }
@@ -234,7 +234,7 @@ public class NotificationPayLoad implements JSONString {
      * @param sound The application bundle path of the sound file to play for this notification or <code>null</code> if this notification
      *              doesn't play a sound.
      */
-    public void setSound(String sound) {
+    public void setSound(final String sound) {
 
         this.sound = sound;
     }
@@ -251,6 +251,7 @@ public class NotificationPayLoad implements JSONString {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String toJSONString() {
 
         JSONBuilder jsonStringer = new JSONStringer().object();
@@ -275,7 +276,7 @@ public class NotificationPayLoad implements JSONString {
 
                 if (alert.getLocArgs() != null && alert.getLocArgs().length > 0) {
                     jsonStringer.key( "loc-args" ).array();
-                    for (Object arg : alert.getLocArgs())
+                    for (final Object arg : alert.getLocArgs())
                         jsonStringer.value( arg );
                     jsonStringer.endArray();
                 }

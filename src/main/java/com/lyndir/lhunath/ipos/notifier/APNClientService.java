@@ -45,7 +45,7 @@ public interface APNClientService {
      * @throws NoSuchAlgorithmException The <code>keyStore</code> provider does not support the necessary algorithms.
      * @throws KeyManagementException   The SSL context could not be initialized using the available private keys.
      */
-    public void fetchUnreachableDevices(UnreachableDevicesCallback callback)
+    void fetchUnreachableDevices(UnreachableDevicesCallback callback)
             throws IOException, KeyManagementException, NoSuchAlgorithmException;
 
     /**
@@ -61,7 +61,7 @@ public interface APNClientService {
      * @return <code>false</code>: The notification queue is full. Wait for it to get emptied by the {@link APNQueue} thread before trying
      *         again.
      */
-    public boolean queueNotification(NotificationDevice device, NotificationPayLoad... notificationPayLoads);
+    boolean queueNotification(NotificationDevice device, NotificationPayLoad... notificationPayLoads);
 
     /**
      * Queue a notification to be sent to the APNs through the {@link APNQueue}.
@@ -76,7 +76,7 @@ public interface APNClientService {
      * @return <code>false</code>: The notification queue is full. Wait for it to get emptied by the {@link APNQueue} thread before trying
      *         again.
      */
-    public boolean queueNotification(NotificationDevice device, JSONObject customData, NotificationPayLoad... notificationPayLoads);
+    boolean queueNotification(NotificationDevice device, JSONObject customData, NotificationPayLoad... notificationPayLoads);
 
     /**
      * Queue a notification to be sent to the APNs through the {@link APNQueue}.
@@ -94,5 +94,5 @@ public interface APNClientService {
      * @return <code>false</code>: The notification queue is full. Wait for it to get emptied by the {@link APNQueue} thread before trying
      *         again.
      */
-    public boolean queueNotification(NotificationDevice device, JSONObject customData, JSONObject... notificationPayLoads);
+    boolean queueNotification(NotificationDevice device, JSONObject customData, JSONObject... notificationPayLoads);
 }
