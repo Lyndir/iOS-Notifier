@@ -51,8 +51,8 @@
     <!-- CODE ACCESS -->
     <scm>
         <url>http://codaset.com/lhunath/ipos-notifier</url>
-        <connection>${scm.github.pubbase}/ipos-notifier.git</connection>
-        <developerConnection>${scm.github.devbase}/ipos-notifier.git</developerConnection>
+        <connection>${scm.codaset.pubbase}/ipos-notifier.git</connection>
+        <developerConnection>${scm.codaset.devbase}/ipos-notifier.git</developerConnection>
     </scm>
 
 
