@@ -56,9 +56,9 @@ public class APNServerConfig {
                                                                      "localhost", 2196, //
                                                                      "TLSv1" );
 
-    private InetSocketAddress apnsAddress;
-    private InetSocketAddress feedBackAddress;
-    private String encryptionProtocol;
+    private final InetSocketAddress apnsAddress;
+    private final InetSocketAddress feedBackAddress;
+    private final String encryptionProtocol;
 
     /**
      * Create a new {@link APNServerConfig} instance.
@@ -69,7 +69,8 @@ public class APNServerConfig {
      * @param feedBackPort       The port of the Apple Push Notification Feedback service socket.
      * @param encryptionProtocol The SSL/TLS protocol to use for transport encryption to these servers.
      */
-    public APNServerConfig(String apnsHostname, int apnsPort, String feedBackHostname, int feedBackPort, String encryptionProtocol) {
+    public APNServerConfig(
+            final String apnsHostname, final int apnsPort, final String feedBackHostname, final int feedBackPort, final String encryptionProtocol) {
 
         this( new InetSocketAddress( apnsHostname, apnsPort ), new InetSocketAddress( feedBackHostname, feedBackPort ),
               encryptionProtocol );
@@ -82,7 +83,7 @@ public class APNServerConfig {
      * @param feedBackAddress    The hostname and port of the Apple Push Notification Feedback service socket.
      * @param encryptionProtocol The SSL/TLS protocol to use for transport encryption to these servers.
      */
-    public APNServerConfig(InetSocketAddress apnsAddress, InetSocketAddress feedBackAddress, String encryptionProtocol) {
+    public APNServerConfig(final InetSocketAddress apnsAddress, final InetSocketAddress feedBackAddress, final String encryptionProtocol) {
 
         this.apnsAddress = apnsAddress;
         this.feedBackAddress = feedBackAddress;

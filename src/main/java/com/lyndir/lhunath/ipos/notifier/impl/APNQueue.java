@@ -45,19 +45,20 @@ public class APNQueue extends LinkedBlockingQueue<ByteBuffer> implements Runnabl
 
     private static final Logger logger = Logger.get( APNQueue.class );
 
-    protected static long DEFAULT_TIMEOUT = 10 * 1000 /* By default, wait 10s before closing the APNs link. */;
+    protected static final long DEFAULT_TIMEOUT = 10 * 1000 /* By default, wait 10s before closing the APNs link. */;
+
+    private final APNClient apnClient;
 
     private long timeout = DEFAULT_TIMEOUT;
     private boolean running;
     private Thread apnQueueThread;
-    private APNClient apnClient;
 
     /**
      * Create a new {@link APNQueue} instance.
      *
      * @param apnClient The Apple Push Notification client interface for sending the queued notifications with.
      */
-    public APNQueue(APNClient apnClient) {
+    public APNQueue(final APNClient apnClient) {
 
         this.apnClient = apnClient;
     }
@@ -73,7 +74,7 @@ public class APNQueue extends LinkedBlockingQueue<ByteBuffer> implements Runnabl
     /**
      * @param timeout The amount of milliseconds after which the connection to the APNs is shut down.
      */
-    public void setTimeout(long timeout) {
+    public void setTimeout(final long timeout) {
 
         this.timeout = timeout;
     }
@@ -81,14 +82,22 @@ public class APNQueue extends LinkedBlockingQueue<ByteBuffer> implements Runnabl
     /**
      * {@inheritDoc}
      */
+    @Override
     public void run() {
 
-        running = true;
-        Thread.currentThread().setName( "APN Dispatch Queue" );
-        logger.inf( "APNQueue is running." );
+        synchronized (this) {
+            running = true;
+            Thread.currentThread().setName( "APN Dispatch Queue" );
+            logger.inf( "APNQueue is running." );
+        }
 
-        while (running)
+        while (true)
             try {
+                synchronized (this) {
+                    if (!running)
+                        break;
+                }
+
                 ByteBuffer dataBuffer = take();
                 apnClient.dispatch( dataBuffer );
 

@@ -56,5 +56,5 @@ public interface UnreachableDevicesCallback {
      * @param uninstalledDevices The {@link Map} that contains the devices on which the application was unreachable. It maps the notified
      *                           device to the date on which Apple first determined the notified application to be unreachable.
      */
-    public void foundUnreachableDevices(Map<NotificationDevice, Date> uninstalledDevices);
+    void foundUnreachableDevices(Map<NotificationDevice, Date> uninstalledDevices);
 }
