@@ -13,11 +13,11 @@
  *   See the License for the specific language governing permissions and
  *   limitations under the License.
  */
-package com.lyndir.lhunath.ipos.notifier;
+package com.lyndir.lhunath.ios.notifier;
 
-import com.lyndir.lhunath.ipos.notifier.data.NotificationDevice;
-import com.lyndir.lhunath.ipos.notifier.data.NotificationPayLoad;
-import com.lyndir.lhunath.ipos.notifier.impl.APNQueue;
+import com.lyndir.lhunath.ios.notifier.data.NotificationDevice;
+import com.lyndir.lhunath.ios.notifier.data.NotificationPayLoad;
+import com.lyndir.lhunath.ios.notifier.impl.APNQueue;
 import java.io.IOException;
 import java.security.KeyManagementException;
 import java.security.NoSuchAlgorithmException;

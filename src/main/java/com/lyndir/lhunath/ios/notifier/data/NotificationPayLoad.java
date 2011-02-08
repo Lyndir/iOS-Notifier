@@ -13,7 +13,7 @@
  *   See the License for the specific language governing permissions and
  *   limitations under the License.
  */
-package com.lyndir.lhunath.ipos.notifier.data;
+package com.lyndir.lhunath.ios.notifier.data;
 
 import net.sf.json.JSONString;
 import net.sf.json.util.JSONBuilder;

@@ -13,7 +13,7 @@
  *   See the License for the specific language governing permissions and
  *   limitations under the License.
  */
-package com.lyndir.lhunath.ipos.notifier.impl;
+package com.lyndir.lhunath.ios.notifier.impl;
 
 import com.lyndir.lhunath.lib.system.logging.Logger;
 import java.io.IOException;

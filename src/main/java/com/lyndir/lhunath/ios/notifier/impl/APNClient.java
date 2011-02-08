@@ -13,15 +13,15 @@
  *   See the License for the specific language governing permissions and
  *   limitations under the License.
  */
-package com.lyndir.lhunath.ipos.notifier.impl;
+package com.lyndir.lhunath.ios.notifier.impl;
 
 import com.google.common.base.Charsets;
-import com.lyndir.lhunath.ipos.notifier.APNClientService;
-import com.lyndir.lhunath.ipos.notifier.UnreachableDevicesCallback;
-import com.lyndir.lhunath.ipos.notifier.data.APNServerConfig;
-import com.lyndir.lhunath.ipos.notifier.data.NotificationDevice;
-import com.lyndir.lhunath.ipos.notifier.data.NotificationPayLoad;
-import com.lyndir.lhunath.ipos.notifier.util.PKIUtils;
+import com.lyndir.lhunath.ios.notifier.APNClientService;
+import com.lyndir.lhunath.ios.notifier.UnreachableDevicesCallback;
+import com.lyndir.lhunath.ios.notifier.data.APNServerConfig;
+import com.lyndir.lhunath.ios.notifier.data.NotificationDevice;
+import com.lyndir.lhunath.ios.notifier.data.NotificationPayLoad;
+import com.lyndir.lhunath.ios.notifier.util.PKIUtils;
 import com.lyndir.lhunath.lib.network.Network;
 import com.lyndir.lhunath.lib.network.NetworkConnectionStateListener;
 import com.lyndir.lhunath.lib.network.NetworkDataListener;

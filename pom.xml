@@ -10,13 +10,13 @@
         <version>1.5</version>
     </parent>
 
-    <groupId>com.lyndir.lhunath.ipos-notifier</groupId>
-    <artifactId>ipos-notifier</artifactId>
+    <groupId>com.lyndir.lhunath.ios-notifier</groupId>
+    <artifactId>ios-notifier</artifactId>
     <version>SNAPSHOT</version>
     <packaging>jar</packaging>
 
-    <name>ipOS Notifier</name>
-    <url>http://ipos-notifier.lhunath.com</url>
+    <name>iOS Notifier</name>
+    <url>http://ios-notifier.lhunath.com</url>
     <inceptionYear>2009</inceptionYear>
     <description>
         Java library for Provider access to the Apple Push Notification server.
@@ -50,9 +50,9 @@
 
     <!-- CODE ACCESS -->
     <scm>
-        <url>http://codaset.com/lhunath/ipos-notifier</url>
-        <connection>${scm.codaset.pubbase}/ipos-notifier.git</connection>
-        <developerConnection>${scm.codaset.devbase}/ipos-notifier.git</developerConnection>
+        <url>http://codaset.com/lhunath/ios-notifier</url>
+        <connection>${scm.codaset.pubbase}/ios-notifier.git</connection>
+        <developerConnection>${scm.codaset.devbase}/ios-notifier.git</developerConnection>
     </scm>
 
 
