@@ -15,12 +15,22 @@
  */
 package com.lyndir.lhunath.ios.notifier.impl;
 
+import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkNotNull;
+
 import com.google.common.base.Charsets;
+import com.google.common.base.Supplier;
+import com.google.gson.FieldNamingPolicy;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.lyndir.lhunath.ios.notifier.APNClientService;
+import com.lyndir.lhunath.ios.notifier.APNResponse;
+import com.lyndir.lhunath.ios.notifier.APNResponseCallback;
 import com.lyndir.lhunath.ios.notifier.UnreachableDevicesCallback;
 import com.lyndir.lhunath.ios.notifier.data.APNServerConfig;
+import com.lyndir.lhunath.ios.notifier.data.APSPayload;
 import com.lyndir.lhunath.ios.notifier.data.NotificationDevice;
-import com.lyndir.lhunath.ios.notifier.data.NotificationPayLoad;
+import com.lyndir.lhunath.ios.notifier.data.Payload;
 import com.lyndir.lhunath.ios.notifier.util.PKIUtils;
 import com.lyndir.lhunath.lib.network.Network;
 import com.lyndir.lhunath.lib.network.NetworkConnectionStateListener;
@@ -37,9 +47,6 @@ import java.security.*;
 import java.util.*;
 import java.util.regex.Pattern;
 import javax.net.ssl.*;
-import net.sf.json.JSONObject;
-import net.sf.json.util.JSONBuilder;
-import net.sf.json.util.JSONStringer;
 
 
 /**
@@ -53,27 +60,44 @@ import net.sf.json.util.JSONStringer;
  */
 public class APNClient implements APNClientService, NetworkConnectionStateListener, NetworkDataListener {
 
-    private static final Logger logger = Logger.get( APNClient.class );
+    private static final Logger  logger        = Logger.get( APNClient.class );
     private static final Pattern NON_PRINTABLE = Pattern.compile( "\\p{Print}" );
 
     private final Collection<NetworkConnectionStateListener> stateListeners = new HashSet<NetworkConnectionStateListener>();
-    private final APNQueue apnQueue = new APNQueue( this );
+    private final APNQueue                                   apnQueue       = new APNQueue( this );
 
-    private Charset payloadEncoding = Charsets.UTF_8;
-    private ByteOrder byteOrder = ByteOrder.BIG_ENDIAN;
-    private short maxPayloadSize = 256;
+    private Gson      gson            = new GsonBuilder() //
+            .disableHtmlEscaping()
+            .disableInnerClassSerialization()
+            .setFieldNamingPolicy( FieldNamingPolicy.LOWER_CASE_WITH_DASHES )
+            .create();
+    private Charset   payloadEncoding = Charsets.UTF_8;
+    private ByteOrder byteOrder       = ByteOrder.BIG_ENDIAN;
+    private short     maxPayloadSize  = 256;
 
-    private KeyManagerFactory keyManagerFactory;
+    private Supplier<Integer> identifierSupplier = new Supplier<Integer>() {
+        private final Random random = new Random();
+
+        @Override
+        public Integer get() {
+
+            return random.nextInt();
+        }
+    };
+
+    private KeyManagerFactory   keyManagerFactory;
     private TrustManagerFactory trustManagerFactory;
-    private APNServerConfig serverConfig;
+    private APNServerConfig     serverConfig;
 
-    private final Network network;
-    private SocketChannel apnsChannel;
-    private SocketChannel feedbackChannel;
-    private ByteBuffer feedbackBuffer;
+    private final Network       network;
+    private       SocketChannel apnsChannel;
+    private       SocketChannel feedbackChannel;
+    private final ByteBuffer    apnResponseBuffer;
+    private       ByteBuffer    feedbackBuffer;
 
     private final Map<NotificationDevice, Date> feedbackDevices;
-    private UnreachableDevicesCallback feedbackCallback;
+    private       UnreachableDevicesCallback    feedbackCallback;
+    private       APNResponseCallback           apnsCallback;
 
     /**
      * Create a new {@link APNClient} instance by setting up the PKIX identity and trust to reasonable defaults from the given parameters.
@@ -92,7 +116,7 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
             throws UnrecoverableKeyException, NoSuchAlgorithmException, KeyStoreException {
 
         this( PKIUtils.createKeyManagerFactory( keyStore, privateKeyPassword ), PKIUtils.createTrustManagerFactory( keyStore ),
-              serverConfig );
+                serverConfig );
     }
 
     /**
@@ -104,11 +128,20 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
      * @param serverConfig        The {@link APNServerConfig} that determines the host configuration of the Apple Push Notification server
      *                            and Feedback service.
      */
-    public APNClient(final KeyManagerFactory keyManagerFactory, final TrustManagerFactory trustManagerFactory, final APNServerConfig serverConfig) {
+    public APNClient(final KeyManagerFactory keyManagerFactory, final TrustManagerFactory trustManagerFactory,
+                     final APNServerConfig serverConfig) {
 
         this.keyManagerFactory = keyManagerFactory;
         this.trustManagerFactory = trustManagerFactory;
         this.serverConfig = serverConfig;
+
+        int apnResponseRecordLength = 0;
+        // Command
+        apnResponseRecordLength += Byte.SIZE / Byte.SIZE;
+        // Status
+        apnResponseRecordLength += Byte.SIZE / Byte.SIZE;
+        // Identifier
+        apnResponseRecordLength += Integer.SIZE / Byte.SIZE;
 
         int uninstalledDeviceRecordLength = 0;
         // UTC UNIX Timestamp
@@ -118,6 +151,7 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
         // Device Token
         uninstalledDeviceRecordLength += 32;
 
+        apnResponseBuffer = ByteBuffer.allocate( apnResponseRecordLength );
         feedbackBuffer = ByteBuffer.allocate( uninstalledDeviceRecordLength );
         feedbackDevices = Collections.synchronizedMap( new HashMap<NotificationDevice, Date>() );
 
@@ -160,8 +194,8 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
      * @throws KeyManagementException   The SSL context could not be initialized using the available private keys.
      * @see <a href="http://java.sun.com/javase/6/docs/technotes/guides/security/StandardNames.html#jssenames">JSSE Protocol Names</a>
      */
-    private static SSLEngine createSSLEngine(final InetSocketAddress serverAddress, final String protocol, final KeyManagerFactory keyManagerFactory,
-                                             final TrustManagerFactory trustManagerFactory)
+    private static SSLEngine createSSLEngine(final InetSocketAddress serverAddress, final String protocol,
+                                             final KeyManagerFactory keyManagerFactory, final TrustManagerFactory trustManagerFactory)
             throws NoSuchAlgorithmException, KeyManagementException {
 
         // Set up an SSL context from identity and trust configurations.
@@ -175,80 +209,32 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
      * {@inheritDoc}
      */
     @Override
-    public boolean queueNotification(final NotificationDevice device, final NotificationPayLoad... notificationPayLoads) {
+    public boolean queueNotification(final NotificationDevice device, final Payload payload, final Date expiryDate) {
 
-        return queueNotification( device, null, notificationPayLoads );
-    }
+        checkNotNull( payload, //
+                "Missing notification payload." );
 
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public boolean queueNotification(final NotificationDevice device, final JSONObject customData, final NotificationPayLoad... notificationPayLoads) {
-
-        List<JSONObject> jsonNotificationPayLoads = new ArrayList<JSONObject>( notificationPayLoads.length );
-        for (final NotificationPayLoad notificationPayLoad : notificationPayLoads)
-            jsonNotificationPayLoads.add( JSONObject.fromObject( notificationPayLoad ) );
-
-        return queueNotification( device, customData, jsonNotificationPayLoads.toArray( new JSONObject[jsonNotificationPayLoads.size()] ) );
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public boolean queueNotification(final NotificationDevice device, final JSONObject customData, final JSONObject... notificationPayLoads) {
-
-        // Check Device Token length.
         int tokenLengthInt = device.getToken().length;
-        if (tokenLengthInt > Short.MAX_VALUE) {
-            logger.err( "Device Token can't be longer than %d bytes; token '%s' is %d bytes.", //
-                        Short.MAX_VALUE, device.getToken(), tokenLengthInt );
-            throw logger.toError( IllegalArgumentException.class );
-        }
+        checkArgument( tokenLengthInt <= Short.MAX_VALUE, //
+                "Device Token can't be longer than %s bytes; token '%s' is %s bytes.", //
+                Short.MAX_VALUE, device.getToken(), tokenLengthInt );
         short tokenLength = (short) tokenLengthInt;
 
-        // Check Notification and Custom Payload.
-        if (notificationPayLoads == null || notificationPayLoads.length == 0) {
-            logger.err( "Must specify at least one notification payload for a notification message." );
-            throw logger.toError( IllegalArgumentException.class );
-        }
+        String jsonPayload = gson.toJson( payload );
+        ByteBuffer payLoadData = getPayloadEncoding().encode( jsonPayload );
 
-        // Construct the Payload.
-        JSONBuilder payLoadStringer = new JSONStringer().object();
-        payLoadStringer.key( "aps" );
-        if (notificationPayLoads.length == 1)
-            payLoadStringer.value( notificationPayLoads[0] );
-        else {
-            payLoadStringer.array();
-            for (final JSONObject notificationPayLoad : notificationPayLoads)
-                payLoadStringer.value( notificationPayLoad );
-            payLoadStringer.endArray();
-        }
-        if (customData != null) {
-            @SuppressWarnings("unchecked")
-            Set<Map.Entry<String, Object>> customDataEntrySet = customData.entrySet();
-            for (final Map.Entry<String, Object> entry : customDataEntrySet) {
-                payLoadStringer.key( entry.getKey() );
-                payLoadStringer.value( entry.getValue() );
-            }
-        }
-        String payLoad = payLoadStringer.endObject().toString();
-
-        // Check Payload length.
-        ByteBuffer payLoadData = getPayloadEncoding().encode( payLoad );
         int payLoadLengthInt = payLoadData.remaining();
-        if (payLoadLengthInt > maxPayloadSize || payLoadLengthInt > Short.MAX_VALUE) {
-            logger.err( "Payload can't be larger than %d bytes; passed payload was %d bytes.", //
-                        Math.min( maxPayloadSize, Short.MAX_VALUE ), payLoadLengthInt );
-            throw logger.toError( IllegalArgumentException.class );
-        }
+        checkArgument( payLoadLengthInt <= maxPayloadSize && payLoadLengthInt <= Short.MAX_VALUE, //
+                "Payload can't be larger than %s bytes; passed payload was %s bytes.", //
+                Math.min( maxPayloadSize, Short.MAX_VALUE ), payLoadLengthInt );
         short payLoadLength = (short) payLoadLengthInt;
 
         // The interface command.
-        byte command = (byte) 0;
+        byte command = (byte) 1;
+        int identifier = identifierSupplier.get();
+        int expiryTime = (int) (expiryDate.getTime() / 1000);
 
-        logger.inf( "Sending notification %s to device %s", payLoad, device );
+        logger.inf( "Sending notification: %s, to device: %s", jsonPayload, device );
 
         // Allocate the interface byte buffer.
         int notificationByteSize = getInterfaceByteSize( tokenLength, payLoadLength );
@@ -256,6 +242,10 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
 
         // Add Interface Command
         notificationData.put( command );
+        // Add Interface Identifier
+        notificationData.putInt( identifier );
+        // Add Interface Expiry Timestamp
+        notificationData.putInt( expiryTime );
         // Add Interface Device Token length
         notificationData.putShort( tokenLength );
         // Add Interface Device Token
@@ -288,8 +278,8 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
      * Calculate the byte size of the interface for sending a certain notification.
      *
      * @param tokenLength   The byte size of the {@link NotificationDevice}'s token that identifies the notification's destination.
-     * @param payLoadLength The byte size of the {@link NotificationPayLoad} when serialized and encoded with the character set as defined
-     *                      by {@link #getPayloadEncoding()}.
+     * @param payLoadLength The byte size of the {@link APSPayload} when serialized and encoded with the character set as defined by {@link
+     *                      #getPayloadEncoding()}.
      *
      * @return The byte size of the notification interface that will be sent to the APNs.
      */
@@ -297,14 +287,18 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
 
         int interfaceByteSize = 0;
 
-        // Command: 1 byte.
-        interfaceByteSize += 1 * Byte.SIZE / Byte.SIZE;
-        // Token length: 1 short.
-        interfaceByteSize += 1 * Short.SIZE / Byte.SIZE;
+        // Command: a byte.
+        interfaceByteSize += Byte.SIZE / Byte.SIZE;
+        // Identifier: an int.
+        interfaceByteSize += Integer.SIZE / Byte.SIZE;
+        // Expiry: an int.
+        interfaceByteSize += Integer.SIZE / Byte.SIZE;
+        // Token length: a short.
+        interfaceByteSize += Short.SIZE / Byte.SIZE;
         // Token
         interfaceByteSize += tokenLength;
-        // Payload length: 1 short.
-        interfaceByteSize += 1 * Short.SIZE / Byte.SIZE;
+        // Payload length: a short.
+        interfaceByteSize += Short.SIZE / Byte.SIZE;
         // Payload
         interfaceByteSize += payLoadLength;
 
@@ -329,7 +323,7 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
 
         if (apnsChannel == null || !apnsChannel.isOpen()) {
             SSLEngine sslEngine = createSSLEngine( getServerConfig().getApnsAddress(), getServerConfig().getEncryptionProtocol(), //
-                                                   getKeyManagerFactory(), getTrustManagerFactory() );
+                    getKeyManagerFactory(), getTrustManagerFactory() );
             apnsChannel = network.connect( getServerConfig().getApnsAddress(), sslEngine );
         }
 
@@ -346,7 +340,7 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
         if (feedbackChannel == null || !feedbackChannel.isOpen()) {
             feedbackCallback = callback;
             SSLEngine sslEngine = createSSLEngine( getServerConfig().getFeedBackAddress(), getServerConfig().getEncryptionProtocol(), //
-                                                   getKeyManagerFactory(), getTrustManagerFactory() );
+                    getKeyManagerFactory(), getTrustManagerFactory() );
             feedbackChannel = network.connect( getServerConfig().getFeedBackAddress(), sslEngine );
         } else
             logger.wrn( "Feedback Service is already being polled." );
@@ -439,6 +433,50 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
     }
 
     /**
+     * @param apnsCallback A callback that should be invoked when an APNs response is received.
+     */
+    public void setResponseCallback(final APNResponseCallback apnsCallback) {
+
+        this.apnsCallback = apnsCallback;
+    }
+
+    /**
+     * @return The JSON serializer used to construct JSON data out of the {@link Payload}.
+     */
+    public Gson getGson() {
+
+        return gson;
+    }
+
+    /**
+     * <p> <b>Do not modify this property unless you have a very good reason to do so.</b> </p>
+     *
+     * @param gson The JSON serializer of this {@link APNClient}.
+     */
+    public void setGson(final Gson gson) {
+
+        this.gson = gson;
+    }
+
+    /**
+     * @return The supplier that provides us with identifiers to use for the push notification payload.
+     */
+    public Supplier<Integer> getIdentifierSupplier() {
+
+        return identifierSupplier;
+    }
+
+    /**
+     * <p> <b>Do not modify this property unless you have a very good reason to do so.</b> </p>
+     *
+     * @param identifierSupplier The supplier that provides us with identifiers to use for the push notification payload.
+     */
+    public void setIdentifierSupplier(final Supplier<Integer> identifierSupplier) {
+
+        this.identifierSupplier = identifierSupplier;
+    }
+
+    /**
      * The Apple specifications (at the time of this writing) define the byte order to be {@link ByteOrder#BIG_ENDIAN}.
      *
      * @return The {@link ByteOrder} of bytes sent to the Apple Push Notification server's raw interface.
@@ -461,8 +499,7 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
     /**
      * <p> <b>Do not modify this property unless you have a very good reason to do so.</b> </p>
      *
-     * @param maxPayloadSize The maximum allowed byte size of the serialized {@link NotificationPayLoad} encoded with {@link
-     *                       #getPayloadEncoding()}.
+     * @param maxPayloadSize The maximum allowed byte size of the serialized {@link APSPayload} encoded with {@link #getPayloadEncoding()}.
      */
     public void setMaxPayloadSize(final short maxPayloadSize) {
 
@@ -472,7 +509,7 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
     /**
      * The Apple specifications (at the time of this writing) define the maximum payload byte size to be <code>256 bytes</code>.
      *
-     * @return The maximum allowed byte size of the serialized {@link NotificationPayLoad} encoded with {@link #getPayloadEncoding()}.
+     * @return The maximum allowed byte size of the serialized {@link APSPayload} encoded with {@link #getPayloadEncoding()}.
      */
     public short getMaxPayloadSize() {
 
@@ -565,6 +602,39 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
     @Override
     public void received(final ByteBuffer dataBuffer, final SocketChannel channel) {
 
+        if (channel == apnsChannel) {
+            logger.dbg( "Received %d bytes of APNs response", dataBuffer.remaining() );
+            dataBuffer.order( getByteOrder() );
+
+            // Transfer the data into the APN response buffer and make it ready for reading.
+            apnResponseBuffer.put( dataBuffer );
+            logger.dbg( "apnResponseBuffer is now %d bytes, %d remaining", apnResponseBuffer.position(), apnResponseBuffer.remaining() );
+
+            // Parse the bytes in the APN response buffer in as uninstalled device records.
+            if (apnResponseBuffer.remaining() == 0) {
+                apnResponseBuffer.flip();
+                byte command = apnResponseBuffer.get();
+                logger.dbg( "command is %d", Byte.valueOf( command ).intValue() );
+
+                if (command == (byte) 8) {
+                    byte status = apnResponseBuffer.get();
+                    int identifier = apnResponseBuffer.getInt();
+                    final APNResponse response = new APNResponse( status, identifier );
+                    logger.inf( "Received APN response: %s", response );
+
+                    if (apnsCallback != null)
+                        new Thread( new Runnable() {
+
+                            @Override
+                            public void run() {
+
+                                apnsCallback.responseReceived( response );
+                            }
+                        }, "APN Response Callback" ).start();
+                }
+            }
+        }
+
         if (channel == feedbackChannel) {
             dataBuffer.order( getByteOrder() );
 
@@ -607,7 +677,7 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
                     NotificationDevice device = new NotificationDevice( deviceToken );
 
                     logger.inf( "Feedback service indicated device %s uninstalled the application before %s", //
-                                device, uninstallDate );
+                            device, uninstallDate );
                     feedbackDevices.put( device, uninstallDate );
                 }
 

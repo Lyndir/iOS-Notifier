@@ -15,6 +15,8 @@
  */
 package com.lyndir.lhunath.ios.notifier.data;
 
+import static com.google.common.base.Preconditions.checkArgument;
+
 import com.lyndir.lhunath.lib.system.logging.Logger;
 import java.util.Formatter;
 
@@ -41,7 +43,7 @@ public class NotificationDevice {
 
         if (token.length != 32)
             throw logger.err( "Device token should be 32 bytes long; was %d.", //
-                              token.length ).toError( IllegalArgumentException.class );
+                    token.length ).toError( IllegalArgumentException.class );
 
         this.token = token;
     }
@@ -64,9 +66,8 @@ public class NotificationDevice {
      */
     private static byte[] deviceTokenHexToBytes(final String hexDeviceToken) {
 
-        if (hexDeviceToken.length() != 64)
-            throw logger.err( "Device token (%s) should be 64 hexadecimal characters long; was %d.", //
-                              hexDeviceToken, hexDeviceToken.length() ).toError( IllegalArgumentException.class );
+        checkArgument( hexDeviceToken.length() == 64, "Device token (%s) should be 64 hexadecimal characters long; was %s.", //
+                hexDeviceToken, hexDeviceToken.length() );
 
         byte[] deviceToken = new byte[hexDeviceToken.length() / 2];
         for (int i = 0; i < hexDeviceToken.length(); i += 2)

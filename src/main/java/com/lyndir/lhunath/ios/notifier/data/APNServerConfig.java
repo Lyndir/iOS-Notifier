@@ -15,6 +15,8 @@
  */
 package com.lyndir.lhunath.ios.notifier.data;
 
+import com.lyndir.lhunath.lib.system.util.ObjectMeta;
+import com.lyndir.lhunath.lib.system.util.ObjectUtils;
 import java.net.InetSocketAddress;
 
 
@@ -27,23 +29,24 @@ import java.net.InetSocketAddress;
  *
  * @author lhunath
  */
+@ObjectMeta
 public class APNServerConfig {
 
     /**
      * The default Apple Push Notification Sandbox environment to be used during development and testing.
      */
     public static final APNServerConfig SANDBOX = new APNServerConfig( //
-                                                                       "gateway.sandbox.push.apple.com", 2195, //
-                                                                       "feedback.sandbox.push.apple.com", 2196, //
-                                                                       "TLSv1" );
+            "gateway.sandbox.push.apple.com", 2195, //
+            "feedback.sandbox.push.apple.com", 2196, //
+            "TLSv1" );
 
     /**
      * The default Apple Push Notification Production environment to be used for live applications.
      */
     public static final APNServerConfig PRODUCTION = new APNServerConfig( //
-                                                                          "gateway.push.apple.com", 2195, //
-                                                                          "feedback.push.apple.com", 2196, //
-                                                                          "TLSv1" );
+            "gateway.push.apple.com", 2195, //
+            "feedback.push.apple.com", 2196, //
+            "TLSv1" );
 
     /**
      * Connect to a dummy environment on the local host for debugging purposes.
@@ -52,13 +55,13 @@ public class APNServerConfig {
      * (Feedback service). You could, for example, use <code>stunnel</code> & <code>netcat</code> for this purpose. </p>
      */
     public static final APNServerConfig LOCAL = new APNServerConfig( //
-                                                                     "localhost", 2195, //
-                                                                     "localhost", 2196, //
-                                                                     "TLSv1" );
+            "localhost", 2195, //
+            "localhost", 2196, //
+            "TLSv1" );
 
     private final InetSocketAddress apnsAddress;
     private final InetSocketAddress feedBackAddress;
-    private final String encryptionProtocol;
+    private final String            encryptionProtocol;
 
     /**
      * Create a new {@link APNServerConfig} instance.
@@ -69,11 +72,11 @@ public class APNServerConfig {
      * @param feedBackPort       The port of the Apple Push Notification Feedback service socket.
      * @param encryptionProtocol The SSL/TLS protocol to use for transport encryption to these servers.
      */
-    public APNServerConfig(
-            final String apnsHostname, final int apnsPort, final String feedBackHostname, final int feedBackPort, final String encryptionProtocol) {
+    public APNServerConfig(final String apnsHostname, final int apnsPort, final String feedBackHostname, final int feedBackPort,
+                           final String encryptionProtocol) {
 
         this( new InetSocketAddress( apnsHostname, apnsPort ), new InetSocketAddress( feedBackHostname, feedBackPort ),
-              encryptionProtocol );
+                encryptionProtocol );
     }
 
     /**
@@ -112,5 +115,23 @@ public class APNServerConfig {
     public String getEncryptionProtocol() {
 
         return encryptionProtocol;
+    }
+
+    @Override
+    public String toString() {
+
+        return ObjectUtils.toString( this );
+    }
+
+    @Override
+    public int hashCode() {
+
+        return ObjectUtils.hashCode( this );
+    }
+
+    @Override
+    public boolean equals(final Object obj) {
+
+        return ObjectUtils.equals( this, obj );
     }
 }

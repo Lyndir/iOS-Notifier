@@ -16,12 +16,12 @@
 package com.lyndir.lhunath.ios.notifier;
 
 import com.lyndir.lhunath.ios.notifier.data.NotificationDevice;
-import com.lyndir.lhunath.ios.notifier.data.NotificationPayLoad;
+import com.lyndir.lhunath.ios.notifier.data.Payload;
 import com.lyndir.lhunath.ios.notifier.impl.APNQueue;
 import java.io.IOException;
 import java.security.KeyManagementException;
 import java.security.NoSuchAlgorithmException;
-import net.sf.json.JSONObject;
+import java.util.Date;
 
 
 /**
@@ -51,48 +51,14 @@ public interface APNClientService {
     /**
      * Queue a notification to be sent to the APNs through the {@link APNQueue}.
      *
-     * <p> This is a convenience variant of the {@link #queueNotification(NotificationDevice, JSONObject, NotificationPayLoad...)} method
-     * that does not pass any custom data. </p>
-     *
-     * @param device               The device that is the notification's destination.
-     * @param notificationPayLoads The notification payloads. These payloads describe the actual events the notification should trigger on
-     *                             the device. You can specify multiple notification events, and must specify at least one.
-     *
-     * @return <code>false</code>: The notification queue is full. Wait for it to get emptied by the {@link APNQueue} thread before trying
-     *         again.
-     */
-    boolean queueNotification(NotificationDevice device, NotificationPayLoad... notificationPayLoads);
-
-    /**
-     * Queue a notification to be sent to the APNs through the {@link APNQueue}.
-     *
-     * @param device               The device that is the notification's destination.
-     * @param customData           Any optional custom data you want to pass to the application. Remember that the total payload size (this
-     *                             and the <code>notificationPayLoads</code> combined) is limited to <code>256 bytes</code>, so be modest.
-     *                             You can specify <code>null</code> here to omit any custom data.
-     * @param notificationPayLoads The notification payloads. These payloads describe the actual events the notification should trigger on
-     *                             the device. You can specify multiple notification events, and must specify at least one.
+     * @param device     The device that is the notification's destination.
+     * @param payload    The payload that describes the notification to send to the client. Remember that the total payload size is limited
+     *                   to <code>256 bytes</code>, so be modest.
+     * @param expiryDate The date and time at which this notification should expire. If the notification cannot be delivered before this
+     *                   time, it will be discarded.
      *
      * @return <code>false</code>: The notification queue is full. Wait for it to get emptied by the {@link APNQueue} thread before trying
      *         again.
      */
-    boolean queueNotification(NotificationDevice device, JSONObject customData, NotificationPayLoad... notificationPayLoads);
-
-    /**
-     * Queue a notification to be sent to the APNs through the {@link APNQueue}.
-     *
-     * <p> You should probably use {@link #queueNotification(NotificationDevice, JSONObject, NotificationPayLoad...)} instead. </p>
-     *
-     * @param device               The device that is the notification's destination.
-     * @param customData           Any optional custom data you want to pass to the application. Remember that the total payload size (this
-     *                             and the <code>notificationPayLoads</code> combined) is limited to <code>256 bytes</code>, so be modest.
-     *                             You can specify <code>null</code> here to omit any custom data.
-     * @param notificationPayLoads The JSON representation of the notification payloads. These payloads describe the actual events the
-     *                             notification should trigger on the device. You can specify multiple notification events, and must specify
-     *                             at least one.
-     *
-     * @return <code>false</code>: The notification queue is full. Wait for it to get emptied by the {@link APNQueue} thread before trying
-     *         again.
-     */
-    boolean queueNotification(NotificationDevice device, JSONObject customData, JSONObject... notificationPayLoads);
+    boolean queueNotification(NotificationDevice device, Payload payload, Date expiryDate);
 }
