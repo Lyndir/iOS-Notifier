@@ -15,45 +15,34 @@
  */
 package com.lyndir.lhunath.ios.notifier.impl;
 
-import static com.google.common.base.Preconditions.checkArgument;
-import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.base.Preconditions.*;
 
 import com.google.common.base.Charsets;
 import com.google.common.base.Supplier;
-import com.google.gson.FieldNamingPolicy;
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.lyndir.lhunath.ios.notifier.APNClientService;
-import com.lyndir.lhunath.ios.notifier.APNResponse;
-import com.lyndir.lhunath.ios.notifier.APNResponseCallback;
-import com.lyndir.lhunath.ios.notifier.UnreachableDevicesCallback;
-import com.lyndir.lhunath.ios.notifier.data.APNServerConfig;
-import com.lyndir.lhunath.ios.notifier.data.APSPayload;
-import com.lyndir.lhunath.ios.notifier.data.NotificationDevice;
-import com.lyndir.lhunath.ios.notifier.data.Payload;
+import com.google.gson.*;
+import com.lyndir.lhunath.ios.notifier.*;
+import com.lyndir.lhunath.ios.notifier.data.*;
 import com.lyndir.lhunath.ios.notifier.util.PKIUtils;
-import com.lyndir.lhunath.lib.network.Network;
-import com.lyndir.lhunath.lib.network.NetworkConnectionStateListener;
-import com.lyndir.lhunath.lib.network.NetworkDataListener;
+import com.lyndir.lhunath.lib.network.*;
 import com.lyndir.lhunath.lib.system.logging.Logger;
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.nio.BufferUnderflowException;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
+import java.nio.*;
 import java.nio.channels.SocketChannel;
 import java.nio.charset.Charset;
 import java.security.*;
 import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.regex.Pattern;
 import javax.net.ssl.*;
 
 
 /**
  * <h2>{@link APNClient}<br> <sub>An APNs client for queueing and dispatching notifications to the APNs.</sub></h2>
- *
+ * <p/>
  * <p> TODO </p>
- *
+ * <p/>
  * <p> <i>Jun 18, 2009</i> </p>
  *
  * @author lhunath
@@ -64,6 +53,7 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
     private static final Pattern NON_PRINTABLE = Pattern.compile( "\\p{Print}" );
 
     private final Collection<NetworkConnectionStateListener> stateListeners = new HashSet<NetworkConnectionStateListener>();
+    private final ExecutorService                            executor       = Executors.newCachedThreadPool();
     private final APNQueue                                   apnQueue       = new APNQueue( this );
 
     private Gson      gson            = new GsonBuilder() //
@@ -307,8 +297,9 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
 
     /**
      * Dispatch the given notification interface to the APNs.
-     *
-     * <p> This operation will establish a connection to the configured APNs if one is not active already. Note that the connection will not
+     * <p/>
+     * <p> This operation will establish a connection to the configured APNs if one is not active already. Note that the connection will
+     * not
      * be terminated automatically. You are responsible for calling {@link #closeAPNs()} when you determine you won't be dispatching any
      * more messages soon. </p>
      *
@@ -364,7 +355,7 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
 
     /**
      * The key factory configured for the APN client.
-     *
+     * <p/>
      * <p> Uses private key entries from the <code>keyStore</code> it was created with to provide client authentication with the server.
      * </p>
      *
@@ -390,7 +381,7 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
 
     /**
      * The trust factory configured for the APN client.
-     *
+     * <p/>
      * <p> The trust factory provides simple trust for each trusted certificate in the <code>keyStore</code> it was created with. </p>
      *
      * @return The factory for {@link TrustManager}s.
@@ -518,7 +509,7 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
 
     /**
      * Obtain a reference to the {@link Network} framework used by this {@link APNClient} for its network connectivity.
-     *
+     * <p/>
      * <p> <b>Accessing the {@link Network} framework directly is strongly discouraged.</b> {@link APNClient} provides an interface for all
      * features you should need. This method is mostly here for advanced usage. Going behind the back of {@link APNClient} is ill-advised.
      * You have been warned. </p>
@@ -532,7 +523,7 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
 
     /**
      * Register an object for receiving APNs network connection state updates.
-     *
+     * <p/>
      * <p> This call is a facade to the {@link Network#registerConnectionStateListener(NetworkConnectionStateListener)}. However, in the
      * interest of encapsulation, only notifications about the connection to the APNs will be relayed. </p>
      *
@@ -580,14 +571,14 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
         if (channel == feedbackChannel) {
             logger.inf( "Disconnected from Feedback Service" );
             if (!feedbackDevices.isEmpty() && feedbackCallback != null)
-                new Thread( new Runnable() {
+                executor.submit( new Runnable() {
 
                     @Override
                     public void run() {
 
                         feedbackCallback.foundUnreachableDevices( feedbackDevices );
                     }
-                }, "APN Feedback Service Callback" ).start();
+                } );
         }
 
         // Forward this event to our own state listeners if it's about the APNs connection.
@@ -614,7 +605,6 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
             if (apnResponseBuffer.remaining() == 0) {
                 apnResponseBuffer.flip();
                 byte command = apnResponseBuffer.get();
-                logger.dbg( "command is %d", Byte.valueOf( command ).intValue() );
 
                 if (command == (byte) 8) {
                     byte status = apnResponseBuffer.get();
@@ -623,15 +613,20 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
                     logger.inf( "Received APN response: %s", response );
 
                     if (apnsCallback != null)
-                        new Thread( new Runnable() {
+                        executor.submit( new Runnable() {
 
                             @Override
                             public void run() {
 
                                 apnsCallback.responseReceived( response );
                             }
-                        }, "APN Response Callback" ).start();
+                        } );
+                } else {
+                    logger.wrn( "APN response command not implemented: %d", Byte.valueOf( command ).intValue() );
+                    apnResponseBuffer.position( apnResponseBuffer.limit() );
                 }
+
+                apnResponseBuffer.compact();
             }
         }
 
@@ -659,9 +654,9 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
             }
             feedbackBuffer.flip();
 
-            logger.inf( "Received from Feedback Service:" );
-            logger.inf( "%s", bits );
-            logger.inf( "%s | %s", hexBytes, bytes );
+            logger.dbg( "Received from Feedback Service:" );
+            logger.dbg( "%s", bits );
+            logger.dbg( "%s | %s", hexBytes, bytes );
 
             // Parse the bytes in the feedbackBuffer in as uninstalled device records.
             while (feedbackBuffer.remaining() > 0)
@@ -694,7 +689,7 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
 
     /**
      * Close active connections to the Apple Push Notification server.
-     *
+     * <p/>
      * <p> <b>Note:</b> This does not close any possible connections to the Apple Push Notification Feedback service. This connection is
      * expected to close automatically when Apple finished dumping its queue. Use {@link #closeFeedbackService()} if for some reason you
      * want to do this anyway. </p>
