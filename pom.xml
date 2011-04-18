@@ -50,9 +50,9 @@
 
     <!-- CODE ACCESS -->
     <scm>
-        <url>http://codaset.com/lhunath/ios-notifier</url>
-        <connection>${scm.codaset.pubbase}/ios-notifier.git</connection>
-        <developerConnection>${scm.codaset.devbase}/ios-notifier.git</developerConnection>
+        <url>${scm.github.webbase>}/iOS-Notifier</scm.github.webbase>
+        <connection>${scm.github.pubbase}/iOS-Notifier.git</connection>
+        <developerConnection>${scm.github.devbase}/iOS-Notifier.git</developerConnection>
     </scm>
 
 
