@@ -71,7 +71,7 @@
         <dependency>
             <groupId>com.lyndir.lhunath.jlibs</groupId>
             <artifactId>system</artifactId>
-            <version>1.4-p5</version>
+            <version>1.4-p7</version>
         </dependency>
         <dependency>
             <groupId>com.lyndir.lhunath.jlibs</groupId>
