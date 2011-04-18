@@ -7,7 +7,7 @@
     <parent>
         <groupId>com.lyndir.lhunath</groupId>
         <artifactId>lyndir</artifactId>
-        <version>1.6</version>
+        <version>1.9</version>
     </parent>
 
     <groupId>com.lyndir.lhunath.ios-notifier</groupId>
