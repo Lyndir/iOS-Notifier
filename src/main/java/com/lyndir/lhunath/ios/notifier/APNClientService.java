@@ -57,8 +57,8 @@ public interface APNClientService {
      * @param expiryDate The date and time at which this notification should expire. If the notification cannot be delivered before this
      *                   time, it will be discarded.
      *
-     * @return <code>false</code>: The notification queue is full. Wait for it to get emptied by the {@link APNQueue} thread before trying
-     *         again.
+     * @return The unique identifier that was assigned to this push message, or <code>null</code> if the notification queue is full.  If the
+     *         queue is full, you should wait for it to get emptied by the {@link APNQueue} thread before trying again.
      */
-    boolean queueNotification(NotificationDevice device, Payload payload, Date expiryDate);
+    Integer queueNotification(NotificationDevice device, Payload payload, Date expiryDate);
 }

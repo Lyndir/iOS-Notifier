@@ -15,8 +15,6 @@
  */
 package com.lyndir.lhunath.ios.notifier.impl;
 
-import static com.google.common.base.Preconditions.*;
-
 import com.google.common.base.Charsets;
 import com.google.common.base.Supplier;
 import com.google.gson.*;
@@ -36,6 +34,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.regex.Pattern;
 import javax.net.ssl.*;
+
+import static com.google.common.base.Preconditions.*;
 
 
 /**
@@ -121,10 +121,6 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
     public APNClient(final KeyManagerFactory keyManagerFactory, final TrustManagerFactory trustManagerFactory,
                      final APNServerConfig serverConfig) {
 
-        this.keyManagerFactory = keyManagerFactory;
-        this.trustManagerFactory = trustManagerFactory;
-        this.serverConfig = serverConfig;
-
         int apnResponseRecordLength = 0;
         // Command
         apnResponseRecordLength += Byte.SIZE / Byte.SIZE;
@@ -148,6 +144,52 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
         network = new Network();
         network.registerConnectionStateListener( this );
         network.registerDataListener( this );
+
+        configure( keyManagerFactory, trustManagerFactory, serverConfig );
+    }
+
+    /**
+     * Update the configuration of the {@link APNClient} instance by setting up the PKIX identity and trust to reasonable defaults from the given parameters.
+     * <p>Note: The APN queue will be closed and restarted if it is open.</p>
+     *
+     * @param keyStore           The keystore which provides all required SSL keys and certificates.
+     * @param privateKeyPassword The password which protects the required <code>keyStore</code>'s private key.
+     * @param serverConfig       The {@link APNServerConfig} that determines the host configuration of the Apple Push Notification server
+     *                           and Feedback service.
+     *
+     * @throws UnrecoverableKeyException The private key could not be accessed from the <code>keyStore</code>. Perhaps the provided
+     *                                   <code>privateKeyPassword</code> is incorrect.
+     * @throws NoSuchAlgorithmException  The <code>keyStore</code> provider does not support the necessary algorithms.
+     * @throws KeyStoreException         The <code>keyStore</code> had not been properly loaded/initialized or is corrupt.
+     */
+    public APNClient configure(final KeyStore keyStore, final String privateKeyPassword, final APNServerConfig serverConfig)
+            throws UnrecoverableKeyException, NoSuchAlgorithmException, KeyStoreException {
+
+        return configure( PKIUtils.createKeyManagerFactory( keyStore, privateKeyPassword ), PKIUtils.createTrustManagerFactory( keyStore ),
+                serverConfig );
+    }
+
+    /**
+     * Update the configuration of the {@link APNClient} instance using a custom configured {@link KeyManagerFactory} and {@link TrustManagerFactory} to
+     * provide PKIX identity and trust.
+     * <p>Note: The APN queue will be closed and restarted if it is open.</p>
+     *
+     * @param trustManagerFactory The factory that will create the SSL context's {@link TrustManager}s.
+     * @param keyManagerFactory   The factory that will create the SSL context's {@link KeyManager}s.
+     * @param serverConfig        The {@link APNServerConfig} that determines the host configuration of the Apple Push Notification server
+     *                            and Feedback service.
+     */
+    public synchronized APNClient configure(final KeyManagerFactory keyManagerFactory, final TrustManagerFactory trustManagerFactory,
+                          final APNServerConfig serverConfig) {
+
+        this.keyManagerFactory = keyManagerFactory;
+        this.trustManagerFactory = trustManagerFactory;
+        this.serverConfig = serverConfig;
+
+        if (apnsChannel != null && apnsChannel.isOpen())
+            closeAPNs();
+
+        return this;
     }
 
     /**
@@ -199,7 +241,7 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
      * {@inheritDoc}
      */
     @Override
-    public boolean queueNotification(final NotificationDevice device, final Payload payload, final Date expiryDate) {
+    public Integer queueNotification(final NotificationDevice device, final Payload payload, final Date expiryDate) {
 
         checkNotNull( payload, //
                 "Missing notification payload." );
@@ -261,7 +303,7 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
             payLoadData.flip();
         }
 
-        return wasQueued;
+        return wasQueued? identifier: null;
     }
 
     /**
@@ -309,7 +351,7 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
      * @throws NoSuchAlgorithmException The <code>keyStore</code> provider does not support the necessary algorithms.
      * @throws KeyManagementException   The SSL context could not be initialized using the available private keys.
      */
-    public void dispatch(final ByteBuffer notificationInterface)
+    public synchronized void dispatch(final ByteBuffer notificationInterface)
             throws IOException, KeyManagementException, NoSuchAlgorithmException {
 
         if (apnsChannel == null || !apnsChannel.isOpen()) {
@@ -694,7 +736,7 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
      * expected to close automatically when Apple finished dumping its queue. Use {@link #closeFeedbackService()} if for some reason you
      * want to do this anyway. </p>
      */
-    public void closeAPNs() {
+    public synchronized void closeAPNs() {
 
         if (apnsChannel != null && apnsChannel.isOpen())
             try {

@@ -32,33 +32,6 @@ import java.net.InetSocketAddress;
 @ObjectMeta
 public class APNServerConfig {
 
-    /**
-     * The default Apple Push Notification Sandbox environment to be used during development and testing.
-     */
-    public static final APNServerConfig SANDBOX = new APNServerConfig( //
-            "gateway.sandbox.push.apple.com", 2195, //
-            "feedback.sandbox.push.apple.com", 2196, //
-            "TLSv1" );
-
-    /**
-     * The default Apple Push Notification Production environment to be used for live applications.
-     */
-    public static final APNServerConfig PRODUCTION = new APNServerConfig( //
-            "gateway.push.apple.com", 2195, //
-            "feedback.push.apple.com", 2196, //
-            "TLSv1" );
-
-    /**
-     * Connect to a dummy environment on the local host for debugging purposes.
-     *
-     * <p> You'll need a TLSv1 supporting server running on <code>localhost</code> at ports <code>2195</code> (APNs) and <code>2196</code>
-     * (Feedback service). You could, for example, use <code>stunnel</code> & <code>netcat</code> for this purpose. </p>
-     */
-    public static final APNServerConfig LOCAL = new APNServerConfig( //
-            "localhost", 2195, //
-            "localhost", 2196, //
-            "TLSv1" );
-
     private final InetSocketAddress apnsAddress;
     private final InetSocketAddress feedBackAddress;
     private final String            encryptionProtocol;
