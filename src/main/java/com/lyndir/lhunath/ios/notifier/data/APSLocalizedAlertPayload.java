@@ -16,8 +16,8 @@
 package com.lyndir.lhunath.ios.notifier.data;
 
 import com.google.gson.annotations.Expose;
-import com.lyndir.lhunath.lib.system.util.ObjectMeta;
-import com.lyndir.lhunath.lib.system.util.ObjectUtils;
+import com.lyndir.lhunath.opal.system.util.ObjectMeta;
+import com.lyndir.lhunath.opal.system.util.ObjectUtils;
 
 
 /**
@@ -37,7 +37,7 @@ public class APSLocalizedAlertPayload extends APSPayload {
      * <h2>{@link Alert}<br> <sub>An alert message to display as a result of an APNs notification.</sub></h2>
      *
      * <p> Alert messages can contain just a body or they can specify localization keys as defined in the destination application's
-     * <code>Localizable.strings</code>. </p>
+     * {@code Localizable.strings}. </p>
      *
      * <p> <i>Jun 23, 2009</i> </p>
      *
@@ -57,7 +57,7 @@ public class APSLocalizedAlertPayload extends APSPayload {
         @Expose
         private final Object[] locArgs;
 
-        public Alert(final String body, final String actionLocKey, final String locKey, final Object[] locArgs) {
+        public Alert(final String body, final String actionLocKey, final String locKey, final Object... locArgs) {
 
             this.body = body;
             this.actionLocKey = actionLocKey;

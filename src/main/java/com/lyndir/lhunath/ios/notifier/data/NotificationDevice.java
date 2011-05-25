@@ -17,7 +17,7 @@ package com.lyndir.lhunath.ios.notifier.data;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
-import com.lyndir.lhunath.lib.system.logging.Logger;
+import com.lyndir.lhunath.opal.system.logging.Logger;
 import java.util.Formatter;
 
 
@@ -41,9 +41,7 @@ public class NotificationDevice {
      */
     public NotificationDevice(final byte[] token) {
 
-        if (token.length != 32)
-            throw logger.err( "Device token should be 32 bytes long; was %d.", //
-                    token.length ).toError( IllegalArgumentException.class );
+        checkArgument( token.length == 32, "Device token should be 32 bytes long; was %s.", token.length );
 
         this.token = token;
     }

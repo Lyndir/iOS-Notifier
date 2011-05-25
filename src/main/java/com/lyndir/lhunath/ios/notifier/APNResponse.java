@@ -1,7 +1,7 @@
 package com.lyndir.lhunath.ios.notifier;
 
-import com.lyndir.lhunath.lib.system.util.ObjectMeta;
-import com.lyndir.lhunath.lib.system.util.ObjectUtils;
+import com.lyndir.lhunath.opal.system.util.ObjectMeta;
+import com.lyndir.lhunath.opal.system.util.ObjectUtils;
 
 
 /**
