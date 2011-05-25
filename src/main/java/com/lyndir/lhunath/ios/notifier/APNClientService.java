@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.security.KeyManagementException;
 import java.security.NoSuchAlgorithmException;
 import java.util.Date;
+import org.jetbrains.annotations.Nullable;
 
 
 /**
@@ -38,11 +39,11 @@ public interface APNClientService {
     /**
      * Fetch unreachable devices from Apple's Feedback service.
      *
-     * @param callback The instance to notify when the unreachable devices have been determined. Use <code>null</code> if you're not
+     * @param callback The instance to notify when the unreachable devices have been determined. Use {@code null} if you're not
      *                 interested in feedback but just want to clear the Apple Push Notification Feedback Service's data queue.
      *
      * @throws IOException              If the system failed to initiate a connection to the Apple Feedback service.
-     * @throws NoSuchAlgorithmException The <code>keyStore</code> provider does not support the necessary algorithms.
+     * @throws NoSuchAlgorithmException The {@code keyStore} provider does not support the necessary algorithms.
      * @throws KeyManagementException   The SSL context could not be initialized using the available private keys.
      */
     void fetchUnreachableDevices(UnreachableDevicesCallback callback)
@@ -53,12 +54,13 @@ public interface APNClientService {
      *
      * @param device     The device that is the notification's destination.
      * @param payload    The payload that describes the notification to send to the client. Remember that the total payload size is limited
-     *                   to <code>256 bytes</code>, so be modest.
+     *                   to {@code 256 bytes}, so be modest.
      * @param expiryDate The date and time at which this notification should expire. If the notification cannot be delivered before this
      *                   time, it will be discarded.
      *
-     * @return The unique identifier that was assigned to this push message, or <code>null</code> if the notification queue is full.  If the
+     * @return The unique identifier that was assigned to this push message, or {@code null} if the notification queue is full.  If the
      *         queue is full, you should wait for it to get emptied by the {@link APNQueue} thread before trying again.
      */
+    @Nullable
     Integer queueNotification(NotificationDevice device, Payload payload, Date expiryDate);
 }

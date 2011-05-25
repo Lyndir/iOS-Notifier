@@ -15,8 +15,9 @@
  */
 package com.lyndir.lhunath.ios.notifier.data;
 
-import com.lyndir.lhunath.lib.system.util.ObjectMeta;
-import com.lyndir.lhunath.lib.system.util.ObjectUtils;
+import com.lyndir.lhunath.opal.system.util.ObjectMeta;
+import com.lyndir.lhunath.opal.system.util.ObjectUtils;
+import java.io.Serializable;
 import java.net.InetSocketAddress;
 
 
@@ -30,7 +31,7 @@ import java.net.InetSocketAddress;
  * @author lhunath
  */
 @ObjectMeta
-public class APNServerConfig {
+public class APNServerConfig implements Serializable {
 
     private final InetSocketAddress apnsAddress;
     private final InetSocketAddress feedBackAddress;

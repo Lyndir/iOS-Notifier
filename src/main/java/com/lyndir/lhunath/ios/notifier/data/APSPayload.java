@@ -16,8 +16,8 @@
 package com.lyndir.lhunath.ios.notifier.data;
 
 import com.google.gson.annotations.Expose;
-import com.lyndir.lhunath.lib.system.util.ObjectMeta;
-import com.lyndir.lhunath.lib.system.util.ObjectUtils;
+import com.lyndir.lhunath.opal.system.util.ObjectMeta;
+import com.lyndir.lhunath.opal.system.util.ObjectUtils;
 
 
 /**
@@ -48,9 +48,9 @@ public abstract class APSPayload {
     /**
      * Create a payload for sending a notification that shows an alert message with a localized body.
      *
-     * @param alertActionKey The localization key (from the application's <code>Localizable.strings</code>) that maps this alert message's
+     * @param alertActionKey The localization key (from the application's {@code Localizable.strings}) that maps this alert message's
      *                       "View" button text.
-     * @param alertBodyKey   The localization key (from the application's <code>Localizable.strings</code>) that maps this alert message's
+     * @param alertBodyKey   The localization key (from the application's {@code Localizable.strings}) that maps this alert message's
      *                       body.
      * @param alertBodyArgs  The arguments to use for expanding format specifiers in the mapped alert message's body.
      *

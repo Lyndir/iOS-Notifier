@@ -37,7 +37,7 @@ public abstract class PKIUtils {
     /**
      * Creates the factory for {@link KeyManager}s which provide the client identity.
      *
-     * <p> Uses private key entries in the given <code>keyStore</code> and unlocks them with the given <code>privateKeyPassword</code>.
+     * <p> Uses private key entries in the given <code>keyStore</code> and unlocks them with the given {@code privateKeyPassword}.
      * </p>
      *
      * @param keyStore           The {@link KeyStore} that provides the private key(s).
@@ -46,9 +46,9 @@ public abstract class PKIUtils {
      * @return A {@link KeyManagerFactory}.
      *
      * @throws NoSuchAlgorithmException  The key's algorithm is not supported by the default key manager's provider.
-     * @throws UnrecoverableKeyException The private key could not be accessed from the <code>keyStore</code>. Perhaps the provided
-     *                                   <code>privateKeyPassword</code> is incorrect.
-     * @throws KeyStoreException         The <code>keyStore</code> has not been properly loaded/initialized or is corrupt.
+     * @throws UnrecoverableKeyException The private key could not be accessed from the {@code keyStore}. Perhaps the provided
+     *                                   {@code privateKeyPassword} is incorrect.
+     * @throws KeyStoreException         The {@code keyStore} has not been properly loaded/initialized or is corrupt.
      */
     public static KeyManagerFactory createKeyManagerFactory(final KeyStore keyStore, final String privateKeyPassword)
             throws NoSuchAlgorithmException, UnrecoverableKeyException, KeyStoreException {
@@ -62,7 +62,7 @@ public abstract class PKIUtils {
     /**
      * Creates the factory for {@link TrustManager}s.
      *
-     * <p> The factory will provide simple trust for each trusted certificate in the given <code>keyStore</code>.<br> No additional optional
+     * <p> The factory will provide simple trust for each trusted certificate in the given {@code keyStore}.<br> No additional optional
      * PKIX validation is performed on the trust path. </p>
      *
      * @param keyStore The {@link KeyStore} that provides the certificates of the trusted Certificate Authorities.
@@ -70,7 +70,7 @@ public abstract class PKIUtils {
      * @return A {@link TrustManagerFactory}.
      *
      * @throws NoSuchAlgorithmException The default trust algorithm is unavailable (see {@link TrustManagerFactory#getDefaultAlgorithm()})
-     * @throws KeyStoreException        The <code>keyStore</code> has not been properly loaded/initialized or is corrupt.
+     * @throws KeyStoreException        The {@code keyStore} has not been properly loaded/initialized or is corrupt.
      */
     public static TrustManagerFactory createTrustManagerFactory(final KeyStore keyStore)
             throws NoSuchAlgorithmException, KeyStoreException {

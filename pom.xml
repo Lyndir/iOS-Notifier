@@ -7,25 +7,18 @@
     <parent>
         <groupId>com.lyndir.lhunath</groupId>
         <artifactId>lyndir</artifactId>
-        <version>1.9</version>
+        <version>1.12</version>
     </parent>
-
-    <groupId>com.lyndir.lhunath.ios-notifier</groupId>
-    <artifactId>ios-notifier</artifactId>
-    <version>SNAPSHOT</version>
-    <packaging>jar</packaging>
 
     <name>iOS Notifier</name>
     <url>http://ios-notifier.lhunath.com</url>
     <inceptionYear>2009</inceptionYear>
-    <description>
-        Java library for Provider access to the Apple Push Notification server.
-    </description>
+    <description>Java library for Provider access to the Apple Push Notification server.</description>
 
-    <organization>
-        <name>Lhunath</name>
-        <url>http://www.lhunath.com</url>
-    </organization>
+    <groupId>com.lyndir.lhunath.ios-notifier</groupId>
+    <artifactId>ios-notifier</artifactId>
+    <version>GIT-SNAPSHOT</version>
+    <packaging>jar</packaging>
 
 
     <!-- DEVELOPERS -->
@@ -50,7 +43,7 @@
 
     <!-- CODE ACCESS -->
     <scm>
-        <url>${scm.github.webbase&gt;}/iOS-Notifier</url>
+        <url>${scm.github.webbase}/iOS-Notifier</url>
         <connection>${scm.github.pubbase}/iOS-Notifier.git</connection>
         <developerConnection>${scm.github.devbase}/iOS-Notifier.git</developerConnection>
     </scm>
@@ -58,7 +51,7 @@
 
     <!-- DEFAULT PROPERTIES -->
     <properties>
-        <release.version>1.1</release.version>
+        <release.version>1.2</release.version>
     </properties>
 
     <!-- BUILD CONFIGURATION -->
@@ -67,16 +60,16 @@
     <!-- DEPENDENCY MANAGEMENT -->
     <dependencies>
 
-        <!-- JLIBS -->
+        <!-- Opal -->
         <dependency>
-            <groupId>com.lyndir.lhunath.jlibs</groupId>
-            <artifactId>system</artifactId>
-            <version>1.4-p7</version>
+            <groupId>com.lyndir.lhunath.opal</groupId>
+            <artifactId>opal-system</artifactId>
+            <version>GIT-SNAPSHOT</version>
         </dependency>
         <dependency>
-            <groupId>com.lyndir.lhunath.jlibs</groupId>
-            <artifactId>pigeon</artifactId>
-            <version>1.4</version>
+            <groupId>com.lyndir.lhunath.opal</groupId>
+            <artifactId>opal-network</artifactId>
+            <version>GIT-SNAPSHOT</version>
         </dependency>
 
         <!-- EXTERNAL DEPENDENCIES -->
@@ -85,9 +78,9 @@
             <artifactId>gson</artifactId>
         </dependency>
         <dependency>
-            <groupId>bouncycastle</groupId>
-            <artifactId>bcprov-jdk15</artifactId>
-            <version>140</version>
+            <groupId>org.bouncycastle</groupId>
+            <artifactId>bcprov-jdk16</artifactId>
+            <version>1.46</version>
         </dependency>
 
         <dependency>

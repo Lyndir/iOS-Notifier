@@ -46,7 +46,7 @@ public interface UnreachableDevicesCallback {
      * finished sending us all of their data). Its execution runs in a new thread (so, not the thread in which you performed {@link
      * APNClient#fetchUnreachableDevices(UnreachableDevicesCallback)} and not the networking thread!). </p>
      *
-     * <p> As soon as you've handled any of the entries in <code>uninstalledDevices</code> you should remove them from the map so that any
+     * <p> As soon as you've handled any of the entries in {@code uninstalledDevices} you should remove them from the map so that any
      * subsequent calls of this method provide current data. </p>
      *
      * <p> <b>Remember that the timestamp mapped by the {@link NotificationDevice} is only an indication. It only guarantees that at that

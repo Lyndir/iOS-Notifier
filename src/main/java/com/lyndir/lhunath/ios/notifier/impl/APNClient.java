@@ -15,14 +15,16 @@
  */
 package com.lyndir.lhunath.ios.notifier.impl;
 
+import static com.google.common.base.Preconditions.*;
+
 import com.google.common.base.Charsets;
 import com.google.common.base.Supplier;
 import com.google.gson.*;
 import com.lyndir.lhunath.ios.notifier.*;
 import com.lyndir.lhunath.ios.notifier.data.*;
 import com.lyndir.lhunath.ios.notifier.util.PKIUtils;
-import com.lyndir.lhunath.lib.network.*;
-import com.lyndir.lhunath.lib.system.logging.Logger;
+import com.lyndir.lhunath.opal.network.*;
+import com.lyndir.lhunath.opal.system.logging.Logger;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.*;
@@ -34,8 +36,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.regex.Pattern;
 import javax.net.ssl.*;
-
-import static com.google.common.base.Preconditions.*;
+import org.jetbrains.annotations.Nullable;
 
 
 /**
@@ -93,14 +94,14 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
      * Create a new {@link APNClient} instance by setting up the PKIX identity and trust to reasonable defaults from the given parameters.
      *
      * @param keyStore           The keystore which provides all required SSL keys and certificates.
-     * @param privateKeyPassword The password which protects the required <code>keyStore</code>'s private key.
+     * @param privateKeyPassword The password which protects the required {@code keyStore}'s private key.
      * @param serverConfig       The {@link APNServerConfig} that determines the host configuration of the Apple Push Notification server
      *                           and Feedback service.
      *
-     * @throws UnrecoverableKeyException The private key could not be accessed from the <code>keyStore</code>. Perhaps the provided
-     *                                   <code>privateKeyPassword</code> is incorrect.
-     * @throws NoSuchAlgorithmException  The <code>keyStore</code> provider does not support the necessary algorithms.
-     * @throws KeyStoreException         The <code>keyStore</code> had not been properly loaded/initialized or is corrupt.
+     * @throws UnrecoverableKeyException The private key could not be accessed from the {@code keyStore}. Perhaps the provided
+     *                                   {@code privateKeyPassword} is incorrect.
+     * @throws NoSuchAlgorithmException  The {@code keyStore} provider does not support the necessary algorithms.
+     * @throws KeyStoreException         The {@code keyStore} had not been properly loaded/initialized or is corrupt.
      */
     public APNClient(final KeyStore keyStore, final String privateKeyPassword, final APNServerConfig serverConfig)
             throws UnrecoverableKeyException, NoSuchAlgorithmException, KeyStoreException {
@@ -149,18 +150,19 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
     }
 
     /**
-     * Update the configuration of the {@link APNClient} instance by setting up the PKIX identity and trust to reasonable defaults from the given parameters.
+     * Update the configuration of the {@link APNClient} instance by setting up the PKIX identity and trust to reasonable defaults from the
+     * given parameters.
      * <p>Note: The APN queue will be closed and restarted if it is open.</p>
      *
      * @param keyStore           The keystore which provides all required SSL keys and certificates.
-     * @param privateKeyPassword The password which protects the required <code>keyStore</code>'s private key.
+     * @param privateKeyPassword The password which protects the required {@code keyStore}'s private key.
      * @param serverConfig       The {@link APNServerConfig} that determines the host configuration of the Apple Push Notification server
      *                           and Feedback service.
      *
-     * @throws UnrecoverableKeyException The private key could not be accessed from the <code>keyStore</code>. Perhaps the provided
-     *                                   <code>privateKeyPassword</code> is incorrect.
-     * @throws NoSuchAlgorithmException  The <code>keyStore</code> provider does not support the necessary algorithms.
-     * @throws KeyStoreException         The <code>keyStore</code> had not been properly loaded/initialized or is corrupt.
+     * @throws UnrecoverableKeyException The private key could not be accessed from the {@code keyStore}. Perhaps the provided
+     *                                   {@code privateKeyPassword} is incorrect.
+     * @throws NoSuchAlgorithmException  The {@code keyStore} provider does not support the necessary algorithms.
+     * @throws KeyStoreException         The {@code keyStore} had not been properly loaded/initialized or is corrupt.
      */
     public APNClient configure(final KeyStore keyStore, final String privateKeyPassword, final APNServerConfig serverConfig)
             throws UnrecoverableKeyException, NoSuchAlgorithmException, KeyStoreException {
@@ -170,7 +172,8 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
     }
 
     /**
-     * Update the configuration of the {@link APNClient} instance using a custom configured {@link KeyManagerFactory} and {@link TrustManagerFactory} to
+     * Update the configuration of the {@link APNClient} instance using a custom configured {@link KeyManagerFactory} and {@link
+     * TrustManagerFactory} to
      * provide PKIX identity and trust.
      * <p>Note: The APN queue will be closed and restarted if it is open.</p>
      *
@@ -180,14 +183,14 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
      *                            and Feedback service.
      */
     public synchronized APNClient configure(final KeyManagerFactory keyManagerFactory, final TrustManagerFactory trustManagerFactory,
-                          final APNServerConfig serverConfig) {
+                                            final APNServerConfig serverConfig) {
 
         this.keyManagerFactory = keyManagerFactory;
         this.trustManagerFactory = trustManagerFactory;
         this.serverConfig = serverConfig;
 
-        if (apnsChannel != null && apnsChannel.isOpen())
-            closeAPNs();
+        closeAPNs();
+        closeFeedbackService();
 
         return this;
     }
@@ -215,14 +218,14 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
      *
      * @param serverAddress       The hostname and port of the remote server socket to create an SSL engine for.
      * @param protocol            The SSL/TLS protocol to use for secure transport encryption. <p> Valid values depend on what is supported
-     *                            by the <code>sslProvider</code>, but generally speaking there is: <code>SSL, SSLv2, SSLv3, TLS, TLSv1,
+     *                            by the <code>sslProvider</code>, but generally speaking there is: {@code SSL, SSLv2, SSLv3, TLS, TLSv1,}
      *                            TLSv1.1, SSLv2Hello</code>. </p>
      * @param trustManagerFactory The factory that will create the SSL context's {@link TrustManager}s.
      * @param keyManagerFactory   The factory that will create the SSL context's {@link KeyManager}s.
      *
      * @return An {@link SSLEngine}.
      *
-     * @throws NoSuchAlgorithmException The <code>keyStore</code> provider does not support the necessary algorithms.
+     * @throws NoSuchAlgorithmException The {@code keyStore} provider does not support the necessary algorithms.
      * @throws KeyManagementException   The SSL context could not be initialized using the available private keys.
      * @see <a href="http://java.sun.com/javase/6/docs/technotes/guides/security/StandardNames.html#jssenames">JSSE Protocol Names</a>
      */
@@ -237,9 +240,7 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
         return sslContext.createSSLEngine( serverAddress.getHostName(), serverAddress.getPort() );
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    @Nullable
     @Override
     public Integer queueNotification(final NotificationDevice device, final Payload payload, final Date expiryDate) {
 
@@ -348,7 +349,7 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
      * @param notificationInterface The {@link ByteBuffer} containing the raw interface of the notification data to send.
      *
      * @throws IOException              If the system failed to initiate a connection to the APNs.
-     * @throws NoSuchAlgorithmException The <code>keyStore</code> provider does not support the necessary algorithms.
+     * @throws NoSuchAlgorithmException The {@code keyStore} provider does not support the necessary algorithms.
      * @throws KeyManagementException   The SSL context could not be initialized using the available private keys.
      */
     public synchronized void dispatch(final ByteBuffer notificationInterface)
@@ -363,9 +364,6 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
         network.queue( notificationInterface, apnsChannel );
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public void fetchUnreachableDevices(final UnreachableDevicesCallback callback)
             throws IOException, KeyManagementException, NoSuchAlgorithmException {
@@ -398,12 +396,12 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
     /**
      * The key factory configured for the APN client.
      * <p/>
-     * <p> Uses private key entries from the <code>keyStore</code> it was created with to provide client authentication with the server.
+     * <p> Uses private key entries from the {@code keyStore} it was created with to provide client authentication with the server.
      * </p>
      *
      * @return The factory for {@link KeyManager}s which provide the client identity.
      */
-    public KeyManagerFactory getKeyManagerFactory() {
+    public synchronized KeyManagerFactory getKeyManagerFactory() {
 
         return keyManagerFactory;
     }
@@ -413,7 +411,7 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
      *
      * @param keyManagerFactory The factory for {@link KeyManager}s which provide the client identity.
      */
-    public void setKeyManagerFactory(final KeyManagerFactory keyManagerFactory) {
+    public synchronized void setKeyManagerFactory(final KeyManagerFactory keyManagerFactory) {
 
         this.keyManagerFactory = keyManagerFactory;
 
@@ -424,11 +422,11 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
     /**
      * The trust factory configured for the APN client.
      * <p/>
-     * <p> The trust factory provides simple trust for each trusted certificate in the <code>keyStore</code> it was created with. </p>
+     * <p> The trust factory provides simple trust for each trusted certificate in the {@code keyStore} it was created with. </p>
      *
      * @return The factory for {@link TrustManager}s.
      */
-    public TrustManagerFactory getTrustManagerFactory() {
+    public synchronized TrustManagerFactory getTrustManagerFactory() {
 
         return trustManagerFactory;
     }
@@ -438,7 +436,7 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
      *
      * @param trustManagerFactory The factory for {@link TrustManager}s.
      */
-    public void setTrustManagerFactory(final TrustManagerFactory trustManagerFactory) {
+    public synchronized void setTrustManagerFactory(final TrustManagerFactory trustManagerFactory) {
 
         this.trustManagerFactory = trustManagerFactory;
 
@@ -449,7 +447,7 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
     /**
      * @return The server configuration that is used to establish communication to the Apple services.
      */
-    public APNServerConfig getServerConfig() {
+    public synchronized APNServerConfig getServerConfig() {
 
         return serverConfig;
     }
@@ -457,7 +455,7 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
     /**
      * @param serverConfig The server configuration that is used to establish communication to the Apple services.
      */
-    public void setServerConfig(final APNServerConfig serverConfig) {
+    public synchronized void setServerConfig(final APNServerConfig serverConfig) {
 
         this.serverConfig = serverConfig;
 
@@ -540,7 +538,7 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
     }
 
     /**
-     * The Apple specifications (at the time of this writing) define the maximum payload byte size to be <code>256 bytes</code>.
+     * The Apple specifications (at the time of this writing) define the maximum payload byte size to be {@code 256 bytes}.
      *
      * @return The maximum allowed byte size of the serialized {@link APSPayload} encoded with {@link #getPayloadEncoding()}.
      */
@@ -586,32 +584,27 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
         stateListeners.remove( listener );
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public void connected(final SocketChannel channel) {
 
-        if (channel == apnsChannel)
+        if (apnsChannel.equals( channel )) {
             logger.inf( "Connected to APNs" );
 
-        // Forward this event to our own state listeners if it's about the APNs connection.
-        if (channel == apnsChannel)
+            // Forward this event to our own state listeners if it's about the APNs connection.
             for (final NetworkConnectionStateListener stateListener : stateListeners)
                 stateListener.connected( channel );
+        }
+        if (feedbackChannel.equals( channel )) {
+            logger.inf( "Connected to Feedback Service" );
+        }
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public void closed(final SocketChannel channel, final boolean resetByPeer) {
 
-        if (channel == apnsChannel)
-            logger.inf( "Disconnected from APNs" );
-
-        if (channel == feedbackChannel) {
+        if (feedbackChannel.equals( channel )) {
             logger.inf( "Disconnected from Feedback Service" );
+
             if (!feedbackDevices.isEmpty() && feedbackCallback != null)
                 executor.submit( new Runnable() {
 
@@ -624,18 +617,18 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
         }
 
         // Forward this event to our own state listeners if it's about the APNs connection.
-        if (channel == apnsChannel)
+        if (apnsChannel.equals( channel )) {
+            logger.inf( "Disconnected from APNs" );
+
             for (final NetworkConnectionStateListener stateListener : stateListeners)
                 stateListener.closed( channel, resetByPeer );
+        }
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public void received(final ByteBuffer dataBuffer, final SocketChannel channel) {
 
-        if (channel == apnsChannel) {
+        if (apnsChannel.equals( channel )) {
             logger.dbg( "Received %d bytes of APNs response", dataBuffer.remaining() );
             dataBuffer.order( getByteOrder() );
 
@@ -672,7 +665,7 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
             }
         }
 
-        if (channel == feedbackChannel) {
+        if (feedbackChannel.equals( channel )) {
             dataBuffer.order( getByteOrder() );
 
             // Transfer the data into the feedback buffer and make it ready for reading.
@@ -710,7 +703,7 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
                     byte[] deviceToken = new byte[deviceTokenLength];
                     feedbackBuffer.get( deviceToken );
 
-                    Date uninstallDate = new Date( utcUnixTime * 1000 );
+                    Date uninstallDate = new Date( (long) utcUnixTime * 1000 );
                     NotificationDevice device = new NotificationDevice( deviceToken );
 
                     logger.inf( "Feedback service indicated device %s uninstalled the application before %s", //

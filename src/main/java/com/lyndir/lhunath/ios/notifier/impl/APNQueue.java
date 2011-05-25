@@ -15,7 +15,7 @@
  */
 package com.lyndir.lhunath.ios.notifier.impl;
 
-import com.lyndir.lhunath.lib.system.logging.Logger;
+import com.lyndir.lhunath.opal.system.logging.Logger;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.security.KeyManagementException;
@@ -79,17 +79,14 @@ public class APNQueue extends LinkedBlockingQueue<ByteBuffer> implements Runnabl
         this.timeout = timeout;
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public void run() {
 
         synchronized (this) {
             running = true;
-            Thread.currentThread().setName( "APN Dispatch Queue" );
-            logger.inf( "APNQueue is running." );
         }
+        Thread.currentThread().setName( "APN Dispatch Queue" );
+        logger.inf( "APNQueue is running." );
 
         while (true)
             try {

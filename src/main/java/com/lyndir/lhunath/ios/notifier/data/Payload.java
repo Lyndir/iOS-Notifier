@@ -1,8 +1,8 @@
 package com.lyndir.lhunath.ios.notifier.data;
 
 import com.google.gson.annotations.Expose;
-import com.lyndir.lhunath.lib.system.util.ObjectMeta;
-import com.lyndir.lhunath.lib.system.util.ObjectUtils;
+import com.lyndir.lhunath.opal.system.util.ObjectMeta;
+import com.lyndir.lhunath.opal.system.util.ObjectUtils;
 
 
 /**
