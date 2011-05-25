@@ -64,12 +64,12 @@
         <dependency>
             <groupId>com.lyndir.lhunath.opal</groupId>
             <artifactId>opal-system</artifactId>
-            <version>GIT-SNAPSHOT</version>
+            <version>1.5</version>
         </dependency>
         <dependency>
             <groupId>com.lyndir.lhunath.opal</groupId>
             <artifactId>opal-network</artifactId>
-            <version>GIT-SNAPSHOT</version>
+            <version>1.5</version>
         </dependency>
 
         <!-- EXTERNAL DEPENDENCIES -->
