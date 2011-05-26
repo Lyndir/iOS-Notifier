@@ -17,7 +17,7 @@
 
     <groupId>com.lyndir.lhunath.ios-notifier</groupId>
     <artifactId>ios-notifier</artifactId>
-    <version>GIT-SNAPSHOT</version>
+    <version>1.2-p1</version>
     <packaging>jar</packaging>
 
 
