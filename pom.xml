@@ -17,28 +17,8 @@
 
     <groupId>com.lyndir.lhunath.ios-notifier</groupId>
     <artifactId>ios-notifier</artifactId>
-    <version>SNAPSHOT</version>
+    <version>GIT-SNAPSHOT</version>
     <packaging>jar</packaging>
-
-
-    <!-- DEVELOPERS -->
-    <developers>
-        <developer>
-            <id>lhunath</id>
-            <name>Maarten Billemont</name>
-            <email>lhunath@gmail.com</email>
-            <roles>
-                <role>development</role>
-            </roles>
-            <timezone>+1</timezone>
-            <properties>
-                <jabber>lhunath@gmail.com</jabber>
-                <msn>lhunath@lyndir.com</msn>
-                <msn>15559107</msn>
-                <private-email>lhunath@gmail.com</private-email>
-            </properties>
-        </developer>
-    </developers>
 
 
     <!-- CODE ACCESS -->
@@ -80,7 +60,6 @@
         <dependency>
             <groupId>org.bouncycastle</groupId>
             <artifactId>bcprov-jdk16</artifactId>
-            <version>1.46</version>
         </dependency>
 
         <dependency>
