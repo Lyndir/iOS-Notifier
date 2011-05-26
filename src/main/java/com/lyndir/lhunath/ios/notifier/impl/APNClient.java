@@ -25,6 +25,7 @@ import com.lyndir.lhunath.ios.notifier.data.*;
 import com.lyndir.lhunath.ios.notifier.util.PKIUtils;
 import com.lyndir.lhunath.opal.network.*;
 import com.lyndir.lhunath.opal.system.logging.Logger;
+import com.lyndir.lhunath.opal.system.util.ObjectUtils;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.*;
@@ -587,14 +588,14 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
     @Override
     public void connected(final SocketChannel channel) {
 
-        if (apnsChannel.equals( channel )) {
+        if (ObjectUtils.equals( apnsChannel, channel )) {
             logger.inf( "Connected to APNs" );
 
             // Forward this event to our own state listeners if it's about the APNs connection.
             for (final NetworkConnectionStateListener stateListener : stateListeners)
                 stateListener.connected( channel );
         }
-        if (feedbackChannel.equals( channel )) {
+        if (ObjectUtils.equals( feedbackChannel, channel )) {
             logger.inf( "Connected to Feedback Service" );
         }
     }
@@ -602,7 +603,7 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
     @Override
     public void closed(final SocketChannel channel, final boolean resetByPeer) {
 
-        if (feedbackChannel.equals( channel )) {
+        if (ObjectUtils.equals( feedbackChannel, channel )) {
             logger.inf( "Disconnected from Feedback Service" );
 
             if (!feedbackDevices.isEmpty() && feedbackCallback != null)
@@ -617,7 +618,7 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
         }
 
         // Forward this event to our own state listeners if it's about the APNs connection.
-        if (apnsChannel.equals( channel )) {
+        if (ObjectUtils.equals( apnsChannel, channel )) {
             logger.inf( "Disconnected from APNs" );
 
             for (final NetworkConnectionStateListener stateListener : stateListeners)
@@ -628,7 +629,7 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
     @Override
     public void received(final ByteBuffer dataBuffer, final SocketChannel channel) {
 
-        if (apnsChannel.equals( channel )) {
+        if (ObjectUtils.equals( apnsChannel, channel )) {
             logger.dbg( "Received %d bytes of APNs response", dataBuffer.remaining() );
             dataBuffer.order( getByteOrder() );
 
@@ -665,7 +666,7 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
             }
         }
 
-        if (feedbackChannel.equals( channel )) {
+        if (ObjectUtils.equals( feedbackChannel, channel )) {
             dataBuffer.order( getByteOrder() );
 
             // Transfer the data into the feedback buffer and make it ready for reading.
