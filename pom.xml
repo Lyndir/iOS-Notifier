@@ -7,7 +7,7 @@
     <parent>
         <groupId>com.lyndir.lhunath</groupId>
         <artifactId>lyndir</artifactId>
-        <version>1.12</version>
+        <version>1.13</version>
     </parent>
 
     <name>iOS Notifier</name>
@@ -44,12 +44,12 @@
         <dependency>
             <groupId>com.lyndir.lhunath.opal</groupId>
             <artifactId>opal-system</artifactId>
-            <version>1.5</version>
+            <version>GIT-SNAPSHOT</version>
         </dependency>
         <dependency>
             <groupId>com.lyndir.lhunath.opal</groupId>
             <artifactId>opal-network</artifactId>
-            <version>1.5</version>
+            <version>GIT-SNAPSHOT</version>
         </dependency>
 
         <!-- EXTERNAL DEPENDENCIES -->

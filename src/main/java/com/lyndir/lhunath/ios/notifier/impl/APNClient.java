@@ -29,6 +29,7 @@ import com.lyndir.lhunath.opal.system.util.ObjectUtils;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.*;
+import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SocketChannel;
 import java.nio.charset.Charset;
 import java.security.*;
@@ -201,7 +202,7 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
      */
     public synchronized void start() {
 
-        network.bringUp();
+        network.startThread();
         apnQueue.start();
     }
 
@@ -347,13 +348,14 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
      * be terminated automatically. You are responsible for calling {@link #closeAPNs()} when you determine you won't be dispatching any
      * more messages soon. </p>
      *
+     *
      * @param notificationInterface The {@link ByteBuffer} containing the raw interface of the notification data to send.
      *
      * @throws IOException              If the system failed to initiate a connection to the APNs.
      * @throws NoSuchAlgorithmException The {@code keyStore} provider does not support the necessary algorithms.
      * @throws KeyManagementException   The SSL context could not be initialized using the available private keys.
      */
-    public synchronized void dispatch(final ByteBuffer notificationInterface)
+    public synchronized boolean dispatch(final ByteBuffer notificationInterface)
             throws IOException, KeyManagementException, NoSuchAlgorithmException {
 
         if (apnsChannel == null || !apnsChannel.isOpen()) {
@@ -362,7 +364,14 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
             apnsChannel = network.connect( getServerConfig().getApnsAddress(), sslEngine );
         }
 
-        network.queue( notificationInterface, apnsChannel );
+        try {
+            network.send( notificationInterface, apnsChannel );
+        }
+        catch (ClosedChannelException e) {
+            return false;
+        }
+
+        return true;
     }
 
     @Override

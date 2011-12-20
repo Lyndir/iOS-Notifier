@@ -96,10 +96,11 @@ public class APNQueue extends LinkedBlockingQueue<ByteBuffer> implements Runnabl
                 }
 
                 ByteBuffer dataBuffer = take();
-                apnClient.dispatch( dataBuffer );
-
-                while ((dataBuffer = poll( timeout, TimeUnit.MILLISECONDS )) != null)
-                    apnClient.dispatch( dataBuffer );
+                do {
+                    if (!apnClient.dispatch( dataBuffer ))
+                        put( dataBuffer );
+                }
+                while ((dataBuffer = poll( timeout, TimeUnit.MILLISECONDS )) != null);
 
                 // No new notifications have been received in a period of 'timeout' ms; shut down the connection.
                 logger.inf( "APNQueue idle; disconnecting from APNs." );
