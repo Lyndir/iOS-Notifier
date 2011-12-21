@@ -15,13 +15,12 @@
  */
 package com.lyndir.lhunath.ios.notifier.impl;
 
+import com.lyndir.lhunath.ios.notifier.APNException;
 import com.lyndir.lhunath.opal.system.logging.Logger;
-import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.security.KeyManagementException;
-import java.security.NoSuchAlgorithmException;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.TimeUnit;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.concurrent.*;
 
 
 /**
@@ -39,15 +38,15 @@ import java.util.concurrent.TimeUnit;
  *
  * @author lhunath
  */
-public class APNQueue extends LinkedBlockingQueue<ByteBuffer> implements Runnable {
-
-    private static final long serialVersionUID = 1L;
+public class APNQueue implements Runnable {
 
     private static final Logger logger = Logger.get( APNQueue.class );
 
     protected static final long DEFAULT_TIMEOUT = 10 * 60 * 1000 /* By default, wait 10 min before closing the APNs link. */;
 
     private final APNClient apnClient;
+    private final BlockingQueue<ByteBuffer> apnQueue  = new LinkedBlockingQueue<ByteBuffer>();
+    private final List<ByteBuffer>          deadQueue = new LinkedList<ByteBuffer>();
 
     private long timeout = DEFAULT_TIMEOUT;
     private boolean running;
@@ -86,7 +85,7 @@ public class APNQueue extends LinkedBlockingQueue<ByteBuffer> implements Runnabl
             running = true;
         }
         Thread.currentThread().setName( "APN Dispatch Queue" );
-        logger.inf( "APNQueue is running." );
+        logger.inf( "Queue started." );
 
         while (true)
             try {
@@ -95,32 +94,36 @@ public class APNQueue extends LinkedBlockingQueue<ByteBuffer> implements Runnabl
                         break;
                 }
 
-                ByteBuffer dataBuffer = take();
-                do {
-                    if (!apnClient.dispatch( dataBuffer ))
-                        put( dataBuffer );
-                }
-                while ((dataBuffer = poll( timeout, TimeUnit.MILLISECONDS )) != null);
-
-                // No new notifications have been received in a period of 'timeout' ms; shut down the connection.
-                logger.inf( "APNQueue idle; disconnecting from APNs." );
-                apnClient.closeAPNs();
+                for (ByteBuffer apnBuffer = apnQueue.take(); apnBuffer != null; apnBuffer = apnQueue.poll( timeout, TimeUnit.MILLISECONDS ))
+                    try {
+                        apnClient.send( apnBuffer );
+                    }
+                    catch (InterruptedException e) {
+                        logger.wrn( e, "Operation was interrupted." );
+                        deadQueue.add( apnBuffer );
+                        break;
+                    }
+                    catch (APNException e) {
+                        logger.wrn( e, "APN could not be sent." );
+                        deadQueue.add( apnBuffer );
+                    }
             }
 
-            catch (InterruptedException e) {
-                logger.wrn( e, "Operation was interrupted." );
-            }
-            catch (IOException e) {
-                logger.wrn( e, "Network error while dispatching notifications." );
-            }
-            catch (KeyManagementException e) {
-                logger.err( e, "Could not initialize transport security: keys unavailable?" );
-            }
-            catch (NoSuchAlgorithmException e) {
-                logger.bug( e, "Could not initialize transport security: keys algorithms unsupported?" );
-            }
             catch (Throwable t) {
-                logger.err( t, "Caught unexpected throwable to save the APN queue thread." );
+                logger.err( t, "Caught unexpected error." );
+            }
+            finally {
+                logger.inf( "Disconnecting from APNs." );
+                apnClient.closeAPNs();
+
+                if (!deadQueue.isEmpty()) {
+                    logger.inf( "Requeueing %d dead notifications.", deadQueue.size() );
+
+                    synchronized (apnQueue) {
+                        apnQueue.addAll( deadQueue );
+                    }
+                    deadQueue.clear();
+                }
             }
 
         logger.inf( "APNQueue has been shut down." );
@@ -149,5 +152,13 @@ public class APNQueue extends LinkedBlockingQueue<ByteBuffer> implements Runnabl
 
         running = false;
         apnQueueThread.interrupt();
+    }
+
+    public void offer(ByteBuffer apnBuffer) {
+
+        synchronized (apnQueue) {
+            if (!apnQueue.offer( apnBuffer ))
+                throw logger.bug( "APN queue is full, notification was not queued." );
+        }
     }
 }
