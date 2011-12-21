@@ -19,25 +19,25 @@ import static com.google.common.base.Preconditions.*;
 
 import com.google.common.base.Charsets;
 import com.google.common.base.Supplier;
+import com.google.common.collect.Maps;
+import com.google.common.io.ByteStreams;
 import com.google.gson.*;
 import com.lyndir.lhunath.ios.notifier.*;
 import com.lyndir.lhunath.ios.notifier.data.*;
 import com.lyndir.lhunath.ios.notifier.util.PKIUtils;
-import com.lyndir.lhunath.opal.network.*;
 import com.lyndir.lhunath.opal.system.logging.Logger;
-import com.lyndir.lhunath.opal.system.util.ObjectUtils;
-import java.io.IOException;
-import java.net.InetSocketAddress;
+import java.io.*;
 import java.nio.*;
-import java.nio.channels.SocketChannel;
 import java.nio.charset.Charset;
 import java.security.*;
 import java.util.*;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.regex.Pattern;
 import javax.net.ssl.*;
-import org.jetbrains.annotations.Nullable;
+import org.apache.mina.core.buffer.IoBuffer;
+import org.apache.mina.core.future.*;
+import org.apache.mina.core.session.IoSession;
+import org.apache.mina.filter.ssl.SslFilter;
+import org.apache.mina.handler.stream.StreamIoHandler;
+import org.apache.mina.transport.socket.nio.NioSocketConnector;
 
 
 /**
@@ -49,14 +49,19 @@ import org.jetbrains.annotations.Nullable;
  *
  * @author lhunath
  */
-public class APNClient implements APNClientService, NetworkConnectionStateListener, NetworkDataListener {
+public class APNClient implements APNClientService {
 
-    private static final Logger  logger        = Logger.get( APNClient.class );
-    private static final Pattern NON_PRINTABLE = Pattern.compile( "\\p{Print}" );
+    private static final Logger logger = Logger.get( APNClient.class );
 
-    private final Collection<NetworkConnectionStateListener> stateListeners = new HashSet<NetworkConnectionStateListener>();
-    private final ExecutorService                            executor       = Executors.newCachedThreadPool();
-    private final APNQueue                                   apnQueue       = new APNQueue( this );
+    private static final int unreachableDeviceRecordLength =
+            // UTC UNIX Timestamp
+            Integer.SIZE / Byte.SIZE +
+            // Device Token length
+            Short.SIZE / Byte.SIZE +
+            // Device Token
+            32;
+
+    private final APNQueue        apnQueue = new APNQueue( this );
 
     private Gson      gson            = new GsonBuilder() //
             .disableHtmlEscaping()
@@ -81,15 +86,11 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
     private TrustManagerFactory trustManagerFactory;
     private APNServerConfig     serverConfig;
 
-    private final Network       network;
-    private       SocketChannel apnsChannel;
-    private       SocketChannel feedbackChannel;
-    private final ByteBuffer    apnResponseBuffer;
-    private       ByteBuffer    feedbackBuffer;
+    private final NioSocketConnector connector;
+    private       IoSession          apnsSession;
+    private       IoSession          feedbackSession;
 
-    private final Map<NotificationDevice, Date> feedbackDevices;
-    private       UnreachableDevicesCallback    feedbackCallback;
-    private       APNResponseCallback           apnsCallback;
+    private APNResponseCallback apnsCallback;
 
     /**
      * Create a new {@link APNClient} instance by setting up the PKIX identity and trust to reasonable defaults from the given parameters.
@@ -103,9 +104,10 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
      *                                   {@code privateKeyPassword} is incorrect.
      * @throws NoSuchAlgorithmException  The {@code keyStore} provider does not support the necessary algorithms.
      * @throws KeyStoreException         The {@code keyStore} had not been properly loaded/initialized or is corrupt.
+     * @throws KeyManagementException    The SSL context could not be initialized using the available private keys.
      */
     public APNClient(final KeyStore keyStore, final String privateKeyPassword, final APNServerConfig serverConfig)
-            throws UnrecoverableKeyException, NoSuchAlgorithmException, KeyStoreException {
+            throws UnrecoverableKeyException, NoSuchAlgorithmException, KeyStoreException, KeyManagementException {
 
         this( PKIUtils.createKeyManagerFactory( keyStore, privateKeyPassword ), PKIUtils.createTrustManagerFactory( keyStore ),
                 serverConfig );
@@ -119,35 +121,32 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
      * @param keyManagerFactory   The factory that will create the SSL context's {@link KeyManager}s.
      * @param serverConfig        The {@link APNServerConfig} that determines the host configuration of the Apple Push Notification server
      *                            and Feedback service.
+     *
+     * @throws NoSuchAlgorithmException The {@code keyStore} provider does not support the necessary algorithms.
+     * @throws KeyManagementException   The SSL context could not be initialized using the available private keys.
      */
     public APNClient(final KeyManagerFactory keyManagerFactory, final TrustManagerFactory trustManagerFactory,
-                     final APNServerConfig serverConfig) {
+                     final APNServerConfig serverConfig)
+            throws NoSuchAlgorithmException, KeyManagementException {
 
-        int apnResponseRecordLength = 0;
-        // Command
-        apnResponseRecordLength += Byte.SIZE / Byte.SIZE;
-        // Status
-        apnResponseRecordLength += Byte.SIZE / Byte.SIZE;
-        // Identifier
-        apnResponseRecordLength += Integer.SIZE / Byte.SIZE;
-
-        int uninstalledDeviceRecordLength = 0;
-        // UTC UNIX Timestamp
-        uninstalledDeviceRecordLength += Integer.SIZE / Byte.SIZE;
-        // Device Token length
-        uninstalledDeviceRecordLength += Short.SIZE / Byte.SIZE;
-        // Device Token
-        uninstalledDeviceRecordLength += 32;
-
-        apnResponseBuffer = ByteBuffer.allocate( apnResponseRecordLength );
-        feedbackBuffer = ByteBuffer.allocate( uninstalledDeviceRecordLength );
-        feedbackDevices = Collections.synchronizedMap( new HashMap<NotificationDevice, Date>() );
-
-        network = new Network();
-        network.registerConnectionStateListener( this );
-        network.registerDataListener( this );
+        connector = new NioSocketConnector();
+        connector.setHandler( new APNsHandler() );
+        connector.getFilterChain().addFirst( "ssl", //
+                new SslFilter(
+                        createSSLContext( getServerConfig().getEncryptionProtocol(), getKeyManagerFactory(), getTrustManagerFactory() ) ) );
 
         configure( keyManagerFactory, trustManagerFactory, serverConfig );
+    }
+
+    private void updateSSL()
+            throws NoSuchAlgorithmException, KeyManagementException {
+
+        connector.getFilterChain().replace( "ssl", //
+                new SslFilter(
+                        createSSLContext( getServerConfig().getEncryptionProtocol(), getKeyManagerFactory(), getTrustManagerFactory() ) ) );
+
+        closeAPNs();
+        closeFeedbackService();
     }
 
     /**
@@ -160,13 +159,16 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
      * @param serverConfig       The {@link APNServerConfig} that determines the host configuration of the Apple Push Notification server
      *                           and Feedback service.
      *
+     * @return <code>this</code> for chaining.
+     *
      * @throws UnrecoverableKeyException The private key could not be accessed from the {@code keyStore}. Perhaps the provided
      *                                   {@code privateKeyPassword} is incorrect.
      * @throws NoSuchAlgorithmException  The {@code keyStore} provider does not support the necessary algorithms.
      * @throws KeyStoreException         The {@code keyStore} had not been properly loaded/initialized or is corrupt.
+     * @throws KeyManagementException    The SSL context could not be initialized using the available private keys.
      */
     public APNClient configure(final KeyStore keyStore, final String privateKeyPassword, final APNServerConfig serverConfig)
-            throws UnrecoverableKeyException, NoSuchAlgorithmException, KeyStoreException {
+            throws UnrecoverableKeyException, NoSuchAlgorithmException, KeyStoreException, KeyManagementException {
 
         return configure( PKIUtils.createKeyManagerFactory( keyStore, privateKeyPassword ), PKIUtils.createTrustManagerFactory( keyStore ),
                 serverConfig );
@@ -182,17 +184,21 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
      * @param keyManagerFactory   The factory that will create the SSL context's {@link KeyManager}s.
      * @param serverConfig        The {@link APNServerConfig} that determines the host configuration of the Apple Push Notification server
      *                            and Feedback service.
+     *
+     * @return <code>this</code> for chaining.
+     *
+     * @throws NoSuchAlgorithmException The {@code keyStore} provider does not support the necessary algorithms.
+     * @throws KeyManagementException   The SSL context could not be initialized using the available private keys.
      */
     public synchronized APNClient configure(final KeyManagerFactory keyManagerFactory, final TrustManagerFactory trustManagerFactory,
-                                            final APNServerConfig serverConfig) {
+                                            final APNServerConfig serverConfig)
+            throws NoSuchAlgorithmException, KeyManagementException {
 
         this.keyManagerFactory = keyManagerFactory;
         this.trustManagerFactory = trustManagerFactory;
         this.serverConfig = serverConfig;
 
-        closeAPNs();
-        closeFeedbackService();
-
+        updateSSL();
         return this;
     }
 
@@ -201,7 +207,6 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
      */
     public synchronized void start() {
 
-        network.bringUp();
         apnQueue.start();
     }
 
@@ -210,40 +215,38 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
      */
     public void stop() {
 
-        network.stopThread();
+        connector.dispose();
         apnQueue.stop();
     }
 
     /**
-     * Creates an SSL engine.
+     * Creates the SSL context that will be used when connecting to the APNs.
      *
-     * @param serverAddress       The hostname and port of the remote server socket to create an SSL engine for.
      * @param protocol            The SSL/TLS protocol to use for secure transport encryption. <p> Valid values depend on what is supported
      *                            by the <code>sslProvider</code>, but generally speaking there is: {@code SSL, SSLv2, SSLv3, TLS, TLSv1,}
      *                            TLSv1.1, SSLv2Hello</code>. </p>
-     * @param trustManagerFactory The factory that will create the SSL context's {@link TrustManager}s.
      * @param keyManagerFactory   The factory that will create the SSL context's {@link KeyManager}s.
+     * @param trustManagerFactory The factory that will create the SSL context's {@link TrustManager}s.
      *
-     * @return An {@link SSLEngine}.
+     * @return An ssl context configured with the given parameters.
      *
      * @throws NoSuchAlgorithmException The {@code keyStore} provider does not support the necessary algorithms.
      * @throws KeyManagementException   The SSL context could not be initialized using the available private keys.
      * @see <a href="http://java.sun.com/javase/6/docs/technotes/guides/security/StandardNames.html#jssenames">JSSE Protocol Names</a>
      */
-    private static SSLEngine createSSLEngine(final InetSocketAddress serverAddress, final String protocol,
-                                             final KeyManagerFactory keyManagerFactory, final TrustManagerFactory trustManagerFactory)
+    private static SSLContext createSSLContext(final String protocol, final KeyManagerFactory keyManagerFactory,
+                                               final TrustManagerFactory trustManagerFactory)
             throws NoSuchAlgorithmException, KeyManagementException {
 
         // Set up an SSL context from identity and trust configurations.
         SSLContext sslContext = SSLContext.getInstance( protocol );
         sslContext.init( keyManagerFactory.getKeyManagers(), trustManagerFactory.getTrustManagers(), null );
 
-        return sslContext.createSSLEngine( serverAddress.getHostName(), serverAddress.getPort() );
+        return sslContext;
     }
 
-    @Nullable
     @Override
-    public Integer queueNotification(final NotificationDevice device, final Payload payload, final Date expiryDate) {
+    public int queue(final APNRegistration device, final Payload payload, final Date expiryDate) {
 
         checkNotNull( payload, //
                 "Missing notification payload." );
@@ -292,26 +295,20 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
 
         // All done with adding stuff to the notification data buffer. Flip & queue it.
         notificationData.flip();
-        boolean wasQueued;
         synchronized (apnQueue) {
-            wasQueued = apnQueue.offer( notificationData );
+            apnQueue.offer( notificationData );
         }
 
-        if (wasQueued) {
-            logger.inf( "Queued payload: %s", payloadEncoding.decode( payLoadData ) );
-            payLoadData.flip();
-        } else {
-            logger.wrn( "Queue full, not queueing payload: %s", payloadEncoding.decode( payLoadData ) );
-            payLoadData.flip();
-        }
+        logger.inf( "Queued payload: %s", payloadEncoding.decode( payLoadData ) );
+        payLoadData.flip();
 
-        return wasQueued? identifier: null;
+        return identifier;
     }
 
     /**
      * Calculate the byte size of the interface for sending a certain notification.
      *
-     * @param tokenLength   The byte size of the {@link NotificationDevice}'s token that identifies the notification's destination.
+     * @param tokenLength   The byte size of the {@link APNRegistration}'s token that identifies the notification's destination.
      * @param payLoadLength The byte size of the {@link APSPayload} when serialized and encoded with the character set as defined by {@link
      *                      #getPayloadEncoding()}.
      *
@@ -349,33 +346,92 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
      *
      * @param notificationInterface The {@link ByteBuffer} containing the raw interface of the notification data to send.
      *
-     * @throws IOException              If the system failed to initiate a connection to the APNs.
-     * @throws NoSuchAlgorithmException The {@code keyStore} provider does not support the necessary algorithms.
-     * @throws KeyManagementException   The SSL context could not be initialized using the available private keys.
+     * @throws APNException         If the system failed to initiate a connection or write the notification to the APNs.
+     * @throws InterruptedException If the network was interrupted while connecting or sending the notification to the APNs.
      */
-    public synchronized void dispatch(final ByteBuffer notificationInterface)
-            throws IOException, KeyManagementException, NoSuchAlgorithmException {
+    public synchronized void send(final ByteBuffer notificationInterface)
+            throws InterruptedException, APNException {
 
-        if (apnsChannel == null || !apnsChannel.isOpen()) {
-            SSLEngine sslEngine = createSSLEngine( getServerConfig().getApnsAddress(), getServerConfig().getEncryptionProtocol(), //
-                    getKeyManagerFactory(), getTrustManagerFactory() );
-            apnsChannel = network.connect( getServerConfig().getApnsAddress(), sslEngine );
+        if (apnsSession == null || !apnsSession.isConnected()) {
+            apnsSession = null;
+
+            ConnectFuture connectFuture = connector.connect( getServerConfig().getApnsAddress() ).await();
+            Throwable connectException = connectFuture.getException();
+            if (connectException != null)
+                throw new APNException( connectException );
+
+            apnsSession = connectFuture.getSession();
+            if (apnsSession == null)
+                throw new APNException( "Connection failed for an unknown reason." );
         }
 
-        network.queue( notificationInterface, apnsChannel );
+        WriteFuture writeFuture = apnsSession.write( notificationInterface ).await();
+        Throwable writeException = writeFuture.getException();
+        if (writeException != null)
+            throw new APNException( writeException );
+        if (!writeFuture.isWritten())
+            throw new APNException( "Write failed for an unknown reason." );
     }
 
     @Override
-    public void fetchUnreachableDevices(final UnreachableDevicesCallback callback)
-            throws IOException, KeyManagementException, NoSuchAlgorithmException {
+    public Map<APNRegistration, Date> fetchUnreachableDevices()
+            throws InterruptedException, APNException {
 
-        if (feedbackChannel == null || !feedbackChannel.isOpen()) {
-            feedbackCallback = callback;
-            SSLEngine sslEngine = createSSLEngine( getServerConfig().getFeedBackAddress(), getServerConfig().getEncryptionProtocol(), //
-                    getKeyManagerFactory(), getTrustManagerFactory() );
-            feedbackChannel = network.connect( getServerConfig().getFeedBackAddress(), sslEngine );
-        } else
-            logger.wrn( "Feedback Service is already being polled." );
+        if (feedbackSession != null && feedbackSession.isConnected())
+            throw new APNException( "Feedback Service is already being polled." );
+
+        ConnectFuture connectFuture = connector.connect( getServerConfig().getFeedBackAddress() ).await();
+        Throwable connectException = connectFuture.getException();
+        if (connectException != null)
+            throw new APNException( connectException );
+
+        feedbackSession = connectFuture.getSession();
+        if (feedbackSession == null)
+            throw new APNException( "Connection failed for an unknown reason." );
+
+        Map<APNRegistration, Date> feedbackDevices = Maps.newHashMap();
+        IoBuffer feedbackBuffer = IoBuffer.allocate( unreachableDeviceRecordLength ).order( getByteOrder() );
+        ReadFuture readFuture;
+        do {
+            readFuture = feedbackSession.read().await();
+            if (readFuture.isRead()) {
+
+                // Transfer the data into the feedback buffer and make it ready for reading.
+                feedbackBuffer.put( (IoBuffer) readFuture.getMessage() ).flip();
+
+                // Parse the bytes in the feedbackBuffer as unreachable device records.
+                while (feedbackBuffer.remaining() > 0)
+                    try {
+                        feedbackBuffer.mark();
+
+                        int utcUnixTime = feedbackBuffer.getInt();
+                        short deviceTokenLength = feedbackBuffer.getShort();
+                        byte[] deviceToken = new byte[deviceTokenLength];
+                        feedbackBuffer.get( deviceToken );
+
+                        Date unreachableDate = new Date( (long) utcUnixTime * 1000 );
+                        APNRegistration device = new APNRegistration( deviceToken );
+
+                        logger.inf( "Device registration (%s) became unreachable before: %s", device, unreachableDate );
+                        feedbackDevices.put( device, unreachableDate );
+                    }
+
+                    catch (BufferUnderflowException ignored) {
+                        // Not enough bytes in the feedbackBuffer for a whole record; undo our last read operations.
+                        feedbackBuffer.reset();
+                        break;
+                    }
+
+                // Compact what we read out of the buffer.
+                feedbackBuffer.compact();
+            }
+        }
+        while (!readFuture.isClosed());
+
+        if (feedbackBuffer.position() > 0)
+            logger.wrn( "Not all feedback bytes were consumed.  Bytes left: %d", feedbackBuffer.position() );
+
+        return feedbackDevices;
     }
 
     /**
@@ -388,10 +444,13 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
 
     /**
      * @param payloadEncoding The character set used to encode the payload data.
+     *
+     * @return <code>this</code> for chaining.
      */
-    public void setPayloadEncoding(final Charset payloadEncoding) {
+    public APNClient setPayloadEncoding(final Charset payloadEncoding) {
 
         this.payloadEncoding = payloadEncoding;
+        return this;
     }
 
     /**
@@ -411,13 +470,19 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
      * Change the {@link KeyManagerFactory} that is used for client identification during SSL negotiation.
      *
      * @param keyManagerFactory The factory for {@link KeyManager}s which provide the client identity.
+     *
+     * @return <code>this</code> for chaining.
+     *
+     * @throws NoSuchAlgorithmException The {@code keyStore} provider does not support the necessary algorithms.
+     * @throws KeyManagementException   The SSL context could not be initialized using the available private keys.
      */
-    public synchronized void setKeyManagerFactory(final KeyManagerFactory keyManagerFactory) {
+    public synchronized APNClient setKeyManagerFactory(final KeyManagerFactory keyManagerFactory)
+            throws NoSuchAlgorithmException, KeyManagementException {
 
         this.keyManagerFactory = keyManagerFactory;
 
-        closeAPNs();
-        closeFeedbackService();
+        updateSSL();
+        return this;
     }
 
     /**
@@ -436,13 +501,19 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
      * Change the {@link TrustManagerFactory} that is used to provide trust of server identification during SSL negotiation.
      *
      * @param trustManagerFactory The factory for {@link TrustManager}s.
+     *
+     * @return <code>this</code> for chaining.
+     *
+     * @throws NoSuchAlgorithmException The {@code keyStore} provider does not support the necessary algorithms.
+     * @throws KeyManagementException   The SSL context could not be initialized using the available private keys.
      */
-    public synchronized void setTrustManagerFactory(final TrustManagerFactory trustManagerFactory) {
+    public synchronized APNClient setTrustManagerFactory(final TrustManagerFactory trustManagerFactory)
+            throws NoSuchAlgorithmException, KeyManagementException {
 
         this.trustManagerFactory = trustManagerFactory;
 
-        closeAPNs();
-        closeFeedbackService();
+        updateSSL();
+        return this;
     }
 
     /**
@@ -455,21 +526,30 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
 
     /**
      * @param serverConfig The server configuration that is used to establish communication to the Apple services.
+     *
+     * @return <code>this</code> for chaining.
+     *
+     * @throws NoSuchAlgorithmException The {@code keyStore} provider does not support the necessary algorithms.
+     * @throws KeyManagementException   The SSL context could not be initialized using the available private keys.
      */
-    public synchronized void setServerConfig(final APNServerConfig serverConfig) {
+    public synchronized APNClient setServerConfig(final APNServerConfig serverConfig)
+            throws NoSuchAlgorithmException, KeyManagementException {
 
         this.serverConfig = serverConfig;
 
-        closeAPNs();
-        closeFeedbackService();
+        updateSSL();
+        return this;
     }
 
     /**
      * @param apnsCallback A callback that should be invoked when an APNs response is received.
+     *
+     * @return <code>this</code> for chaining.
      */
-    public void setResponseCallback(final APNResponseCallback apnsCallback) {
+    public APNClient setResponseCallback(final APNResponseCallback apnsCallback) {
 
         this.apnsCallback = apnsCallback;
+        return this;
     }
 
     /**
@@ -484,10 +564,13 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
      * <p> <b>Do not modify this property unless you have a very good reason to do so.</b> </p>
      *
      * @param gson The JSON serializer of this {@link APNClient}.
+     *
+     * @return <code>this</code> for chaining.
      */
-    public void setGson(final Gson gson) {
+    public APNClient setGson(final Gson gson) {
 
         this.gson = gson;
+        return this;
     }
 
     /**
@@ -502,10 +585,13 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
      * <p> <b>Do not modify this property unless you have a very good reason to do so.</b> </p>
      *
      * @param identifierSupplier The supplier that provides us with identifiers to use for the push notification payload.
+     *
+     * @return <code>this</code> for chaining.
      */
-    public void setIdentifierSupplier(final Supplier<Integer> identifierSupplier) {
+    public APNClient setIdentifierSupplier(final Supplier<Integer> identifierSupplier) {
 
         this.identifierSupplier = identifierSupplier;
+        return this;
     }
 
     /**
@@ -522,20 +608,26 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
      * <p> <b>Do not modify this property unless you have a very good reason to do so.</b> </p>
      *
      * @param byteOrder The byteOrder of this {@link APNClient}.
+     *
+     * @return <code>this</code> for chaining.
      */
-    public void setByteOrder(final ByteOrder byteOrder) {
+    public APNClient setByteOrder(final ByteOrder byteOrder) {
 
         this.byteOrder = byteOrder;
+        return this;
     }
 
     /**
      * <p> <b>Do not modify this property unless you have a very good reason to do so.</b> </p>
      *
      * @param maxPayloadSize The maximum allowed byte size of the serialized {@link APSPayload} encoded with {@link #getPayloadEncoding()}.
+     *
+     * @return <code>this</code> for chaining.
      */
-    public void setMaxPayloadSize(final short maxPayloadSize) {
+    public APNClient setMaxPayloadSize(final short maxPayloadSize) {
 
         this.maxPayloadSize = maxPayloadSize;
+        return this;
     }
 
     /**
@@ -549,178 +641,17 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
     }
 
     /**
-     * Obtain a reference to the {@link Network} framework used by this {@link APNClient} for its network connectivity.
+     * Obtain a reference to the {@link NioSocketConnector} used by this {@link APNClient} for its network connectivity.
      * <p/>
-     * <p> <b>Accessing the {@link Network} framework directly is strongly discouraged.</b> {@link APNClient} provides an interface for all
-     * features you should need. This method is mostly here for advanced usage. Going behind the back of {@link APNClient} is ill-advised.
-     * You have been warned. </p>
+     * <p> <b>Accessing the {@link NioSocketConnector} directly is strongly discouraged.</b> {@link APNClient} should provide all features
+     * need. This method is here mostly for extensibility and advanced usage. Be careful when going behind the back of {@link APNClient} is
+     * ill-advised. You have been warned. </p>
      *
-     * @return The network instance of this {@link APNClient}.
+     * @return The network connector used by this {@link APNClient}.
      */
-    public Network getNetwork() {
+    public NioSocketConnector getConnector() {
 
-        return network;
-    }
-
-    /**
-     * Register an object for receiving APNs network connection state updates.
-     * <p/>
-     * <p> This call is a facade to the {@link Network#registerConnectionStateListener(NetworkConnectionStateListener)}. However, in the
-     * interest of encapsulation, only notifications about the connection to the APNs will be relayed. </p>
-     *
-     * @param listener The object wishing to be notified of network state changes.
-     */
-    public void registerConnectionStateListener(final NetworkConnectionStateListener listener) {
-
-        stateListeners.add( listener );
-    }
-
-    /**
-     * Unregister an object from receiving APNs network connection state updates. The object will no longer receive state updates.
-     *
-     * @param listener The object that used to be interested in network state changes but no longer is.
-     */
-    public void unregisterConnectionStateListener(final NetworkConnectionStateListener listener) {
-
-        stateListeners.remove( listener );
-    }
-
-    @Override
-    public void connected(final SocketChannel channel) {
-
-        if (ObjectUtils.equals( apnsChannel, channel )) {
-            logger.inf( "Connected to APNs" );
-
-            // Forward this event to our own state listeners if it's about the APNs connection.
-            for (final NetworkConnectionStateListener stateListener : stateListeners)
-                stateListener.connected( channel );
-        }
-        if (ObjectUtils.equals( feedbackChannel, channel )) {
-            logger.inf( "Connected to Feedback Service" );
-        }
-    }
-
-    @Override
-    public void closed(final SocketChannel channel, final boolean resetByPeer) {
-
-        if (ObjectUtils.equals( feedbackChannel, channel )) {
-            logger.inf( "Disconnected from Feedback Service" );
-
-            if (!feedbackDevices.isEmpty() && feedbackCallback != null)
-                executor.submit( new Runnable() {
-
-                    @Override
-                    public void run() {
-
-                        feedbackCallback.foundUnreachableDevices( feedbackDevices );
-                    }
-                } );
-        }
-
-        // Forward this event to our own state listeners if it's about the APNs connection.
-        if (ObjectUtils.equals( apnsChannel, channel )) {
-            logger.inf( "Disconnected from APNs" );
-
-            for (final NetworkConnectionStateListener stateListener : stateListeners)
-                stateListener.closed( channel, resetByPeer );
-        }
-    }
-
-    @Override
-    public void received(final ByteBuffer dataBuffer, final SocketChannel channel) {
-
-        if (ObjectUtils.equals( apnsChannel, channel )) {
-            logger.dbg( "Received %d bytes of APNs response", dataBuffer.remaining() );
-            dataBuffer.order( getByteOrder() );
-
-            // Transfer the data into the APN response buffer and make it ready for reading.
-            apnResponseBuffer.put( dataBuffer );
-            logger.dbg( "apnResponseBuffer is now %d bytes, %d remaining", apnResponseBuffer.position(), apnResponseBuffer.remaining() );
-
-            // Parse the bytes in the APN response buffer in as uninstalled device records.
-            if (apnResponseBuffer.remaining() == 0) {
-                apnResponseBuffer.flip();
-                byte command = apnResponseBuffer.get();
-
-                if (command == (byte) 8) {
-                    byte status = apnResponseBuffer.get();
-                    int identifier = apnResponseBuffer.getInt();
-                    final APNResponse response = new APNResponse( status, identifier );
-                    logger.inf( "Received APN response: %s", response );
-
-                    if (apnsCallback != null)
-                        executor.submit( new Runnable() {
-
-                            @Override
-                            public void run() {
-
-                                apnsCallback.responseReceived( response );
-                            }
-                        } );
-                } else {
-                    logger.wrn( "APN response command not implemented: %d", Byte.valueOf( command ).intValue() );
-                    apnResponseBuffer.position( apnResponseBuffer.limit() );
-                }
-
-                apnResponseBuffer.compact();
-            }
-        }
-
-        if (ObjectUtils.equals( feedbackChannel, channel )) {
-            dataBuffer.order( getByteOrder() );
-
-            // Transfer the data into the feedback buffer and make it ready for reading.
-            if (feedbackBuffer.remaining() < dataBuffer.remaining()) {
-                ByteBuffer newFeedbackBuffer = ByteBuffer.allocate( feedbackBuffer.position() + dataBuffer.remaining() );
-                feedbackBuffer.flip();
-                feedbackBuffer = newFeedbackBuffer.put( feedbackBuffer );
-            }
-            feedbackBuffer.put( dataBuffer ).flip();
-
-            // Visualize the bytes we have in the feedbackBuffer.
-            String bytes = getPayloadEncoding().decode( feedbackBuffer ).toString();
-            NON_PRINTABLE.matcher( bytes ).replaceAll( "." );
-            feedbackBuffer.flip();
-
-            StringBuffer bits = new StringBuffer(), hexBytes = new StringBuffer();
-            while (feedbackBuffer.remaining() > 0) {
-                byte aByte = feedbackBuffer.get();
-                bits.append( ' ' ).append( Integer.toBinaryString( aByte ) );
-                hexBytes.append( ' ' ).append( Integer.toHexString( aByte ) );
-            }
-            feedbackBuffer.flip();
-
-            logger.dbg( "Received from Feedback Service:" );
-            logger.dbg( "%s", bits );
-            logger.dbg( "%s | %s", hexBytes, bytes );
-
-            // Parse the bytes in the feedbackBuffer in as uninstalled device records.
-            while (feedbackBuffer.remaining() > 0)
-                try {
-                    feedbackBuffer.mark();
-
-                    int utcUnixTime = feedbackBuffer.getInt();
-                    short deviceTokenLength = feedbackBuffer.getShort();
-                    byte[] deviceToken = new byte[deviceTokenLength];
-                    feedbackBuffer.get( deviceToken );
-
-                    Date uninstallDate = new Date( (long) utcUnixTime * 1000 );
-                    NotificationDevice device = new NotificationDevice( deviceToken );
-
-                    logger.inf( "Feedback service indicated device %s uninstalled the application before %s", //
-                            device, uninstallDate );
-                    feedbackDevices.put( device, uninstallDate );
-                }
-
-                catch (BufferUnderflowException ignored) {
-                    // Not enough bytes in the dataBuffer for a whole record; undo our last read operations.
-                    feedbackBuffer.reset();
-                    break;
-                }
-
-            // Compact what we read out of the buffer.
-            feedbackBuffer.compact();
-        }
+        return connector;
     }
 
     /**
@@ -732,15 +663,11 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
      */
     public synchronized void closeAPNs() {
 
-        if (apnsChannel != null && apnsChannel.isOpen())
-            try {
-                network.close( apnsChannel );
-                apnsChannel = null;
-            }
+        if (apnsSession == null || !apnsSession.isConnected() || apnsSession.isClosing())
+            return;
 
-            catch (IOException e) {
-                logger.err( e, "While closing the Apple Push Notification server connection:" );
-            }
+        apnsSession.close( false );
+        apnsSession = null;
     }
 
     /**
@@ -748,14 +675,71 @@ public class APNClient implements APNClientService, NetworkConnectionStateListen
      */
     public void closeFeedbackService() {
 
-        if (feedbackChannel != null && feedbackChannel.isOpen())
-            try {
-                network.close( feedbackChannel );
-                feedbackChannel = null;
+        if (feedbackSession == null || !feedbackSession.isConnected() || feedbackSession.isClosing())
+            return;
+
+        feedbackSession.close( false );
+        feedbackSession = null;
+    }
+
+    private class APNsHandler extends StreamIoHandler {
+
+        private final IoBuffer responseBuffer = IoBuffer.allocate(
+                // Command
+                Byte.SIZE / Byte.SIZE +
+                // Status
+                Byte.SIZE / Byte.SIZE +
+                // Identifier
+                Integer.SIZE / Byte.SIZE );
+
+        @Override
+        public void sessionOpened(final IoSession session) {
+
+            logger.inf( "Connected to APNs" );
+
+            responseBuffer.clear();
+            responseBuffer.order( getByteOrder() );
+
+            super.sessionOpened( session );
+        }
+
+        @Override
+        public void sessionClosed(final IoSession session)
+                throws Exception {
+
+            logger.inf( "Disconnected from APNs" );
+
+            responseBuffer.flip();
+            byte command = responseBuffer.get();
+
+            if (command == (byte) 8) {
+                byte status = responseBuffer.get();
+                int identifier = responseBuffer.getInt();
+                final APNResponse response = new APNResponse( status, identifier );
+                logger.inf( "Received APN response: %s", response );
+
+                if (apnsCallback != null)
+                    apnsCallback.responseReceived( response );
+            } else {
+                logger.wrn( "APN response command not implemented: %d", Byte.valueOf( command ).intValue() );
+                responseBuffer.position( responseBuffer.limit() );
             }
 
-            catch (IOException e) {
-                logger.err( e, "While closing the Apple Push Notification Feedback service connection:" );
+            responseBuffer.compact();
+
+            super.sessionClosed( session );
+        }
+
+        @Override
+        protected void processStreamIo(final IoSession session, final InputStream in, final OutputStream out) {
+
+            try {
+                logger.dbg( "Received %d bytes of APNs response", in.available() );
+                responseBuffer.put( ByteStreams.toByteArray( in ) );
             }
+            catch (IOException e) {
+                throw logger.bug( e );
+            }
+        }
     }
 }
