@@ -22,47 +22,46 @@ import java.net.InetSocketAddress;
 
 
 /**
- * <h2>{@link APNServerConfig}<br> <sub>[in short] (TODO).</sub></h2>
- *
+ * <h2>{@link APSConfig}<br> <sub>[in short] (TODO).</sub></h2>
+ * <p/>
  * <p> [description / usage]. </p>
- *
+ * <p/>
  * <p> <i>Jun 30, 2009</i> </p>
  *
  * @author lhunath
  */
 @ObjectMeta
-public class APNServerConfig implements Serializable {
+public class APSConfig implements Serializable {
 
-    private final InetSocketAddress apnsAddress;
+    private final InetSocketAddress apsAddress;
     private final InetSocketAddress feedBackAddress;
     private final String            encryptionProtocol;
 
     /**
-     * Create a new {@link APNServerConfig} instance.
+     * Create a new {@link APSConfig} instance.
      *
-     * @param apnsHostname       The hostname of the Apple Push Notification server.
-     * @param apnsPort           The port of the Apple Push Notification server socket.
+     * @param apsHostname        The hostname of the Apple Push Notification server.
+     * @param apsPort            The port of the Apple Push Notification server socket.
      * @param feedBackHostname   The hostname of the Apple Push Notification Feedback service.
      * @param feedBackPort       The port of the Apple Push Notification Feedback service socket.
      * @param encryptionProtocol The SSL/TLS protocol to use for transport encryption to these servers.
      */
-    public APNServerConfig(final String apnsHostname, final int apnsPort, final String feedBackHostname, final int feedBackPort,
-                           final String encryptionProtocol) {
+    public APSConfig(final String apsHostname, final int apsPort, final String feedBackHostname, final int feedBackPort,
+                     final String encryptionProtocol) {
 
-        this( new InetSocketAddress( apnsHostname, apnsPort ), new InetSocketAddress( feedBackHostname, feedBackPort ),
-                encryptionProtocol );
+        this( new InetSocketAddress( apsHostname, apsPort ), new InetSocketAddress( feedBackHostname, feedBackPort ), encryptionProtocol );
     }
 
     /**
-     * Create a new {@link APNServerConfig} instance.
+     * Create a new {@link APSConfig} instance.
      *
-     * @param apnsAddress        The hostname and port of the Apple Push Notification server socket.
+     * @param apsAddress         The hostname and port of the Apple Push Notification server socket.
      * @param feedBackAddress    The hostname and port of the Apple Push Notification Feedback service socket.
      * @param encryptionProtocol The SSL/TLS protocol to use for transport encryption to these servers.
      */
-    public APNServerConfig(final InetSocketAddress apnsAddress, final InetSocketAddress feedBackAddress, final String encryptionProtocol) {
+    public APSConfig(final InetSocketAddress apsAddress, final InetSocketAddress feedBackAddress, final String encryptionProtocol) {
 
-        this.apnsAddress = apnsAddress;
+        this.apsAddress = apsAddress;
         this.feedBackAddress = feedBackAddress;
         this.encryptionProtocol = encryptionProtocol;
     }
@@ -70,9 +69,9 @@ public class APNServerConfig implements Serializable {
     /**
      * @return The hostname and port of the Apple Push Notification server socket.
      */
-    public InetSocketAddress getApnsAddress() {
+    public InetSocketAddress getAPSAddress() {
 
-        return apnsAddress;
+        return apsAddress;
     }
 
     /**

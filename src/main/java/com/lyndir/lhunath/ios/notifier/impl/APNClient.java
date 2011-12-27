@@ -20,13 +20,11 @@ import static com.google.common.base.Preconditions.*;
 import com.google.common.base.Charsets;
 import com.google.common.base.Supplier;
 import com.google.common.collect.Maps;
-import com.google.common.io.ByteStreams;
 import com.google.gson.*;
 import com.lyndir.lhunath.ios.notifier.*;
 import com.lyndir.lhunath.ios.notifier.data.*;
 import com.lyndir.lhunath.ios.notifier.util.PKIUtils;
 import com.lyndir.lhunath.opal.system.logging.Logger;
-import java.io.*;
 import java.nio.*;
 import java.nio.charset.Charset;
 import java.security.*;
@@ -34,14 +32,14 @@ import java.util.*;
 import javax.net.ssl.*;
 import org.apache.mina.core.buffer.IoBuffer;
 import org.apache.mina.core.future.*;
+import org.apache.mina.core.service.IoHandlerAdapter;
 import org.apache.mina.core.session.IoSession;
 import org.apache.mina.filter.ssl.SslFilter;
-import org.apache.mina.handler.stream.StreamIoHandler;
 import org.apache.mina.transport.socket.nio.NioSocketConnector;
 
 
 /**
- * <h2>{@link APNClient}<br> <sub>An APNs client for queueing and dispatching notifications to the APNs.</sub></h2>
+ * <h2>{@link APNClient}<br> <sub>An APS client for queueing and dispatching notifications to the APS.</sub></h2>
  * <p/>
  * <p> TODO </p>
  * <p/>
@@ -61,7 +59,7 @@ public class APNClient implements APNClientService {
             // Device Token
             32;
 
-    private final APNQueue        apnQueue = new APNQueue( this );
+    private final APNQueue apnQueue = new APNQueue( this );
 
     private Gson      gson            = new GsonBuilder() //
             .disableHtmlEscaping()
@@ -84,20 +82,22 @@ public class APNClient implements APNClientService {
 
     private KeyManagerFactory   keyManagerFactory;
     private TrustManagerFactory trustManagerFactory;
-    private APNServerConfig     serverConfig;
+    private APSConfig           serverConfig;
 
-    private final NioSocketConnector connector;
-    private       IoSession          apnsSession;
-    private       IoSession          feedbackSession;
+    private final NioSocketConnector apsConnector      = new NioSocketConnector();
+    private final NioSocketConnector feedbackConnector = new NioSocketConnector();
+    private IoSession apsSession;
+    private IoSession feedbackSession;
 
-    private APNResponseCallback apnsCallback;
+    private APNResponseCallback apsCallback;
+    private boolean             initialized;
 
     /**
      * Create a new {@link APNClient} instance by setting up the PKIX identity and trust to reasonable defaults from the given parameters.
      *
      * @param keyStore           The keystore which provides all required SSL keys and certificates.
      * @param privateKeyPassword The password which protects the required {@code keyStore}'s private key.
-     * @param serverConfig       The {@link APNServerConfig} that determines the host configuration of the Apple Push Notification server
+     * @param serverConfig       The {@link APSConfig} that determines the host configuration of the Apple Push Notification server
      *                           and Feedback service.
      *
      * @throws UnrecoverableKeyException The private key could not be accessed from the {@code keyStore}. Perhaps the provided
@@ -106,7 +106,7 @@ public class APNClient implements APNClientService {
      * @throws KeyStoreException         The {@code keyStore} had not been properly loaded/initialized or is corrupt.
      * @throws KeyManagementException    The SSL context could not be initialized using the available private keys.
      */
-    public APNClient(final KeyStore keyStore, final String privateKeyPassword, final APNServerConfig serverConfig)
+    public APNClient(final KeyStore keyStore, final String privateKeyPassword, final APSConfig serverConfig)
             throws UnrecoverableKeyException, NoSuchAlgorithmException, KeyStoreException, KeyManagementException {
 
         this( PKIUtils.createKeyManagerFactory( keyStore, privateKeyPassword ), PKIUtils.createTrustManagerFactory( keyStore ),
@@ -119,21 +119,16 @@ public class APNClient implements APNClientService {
      *
      * @param trustManagerFactory The factory that will create the SSL context's {@link TrustManager}s.
      * @param keyManagerFactory   The factory that will create the SSL context's {@link KeyManager}s.
-     * @param serverConfig        The {@link APNServerConfig} that determines the host configuration of the Apple Push Notification server
+     * @param serverConfig        The {@link APSConfig} that determines the host configuration of the Apple Push Notification server
      *                            and Feedback service.
      *
      * @throws NoSuchAlgorithmException The {@code keyStore} provider does not support the necessary algorithms.
      * @throws KeyManagementException   The SSL context could not be initialized using the available private keys.
      */
-    public APNClient(final KeyManagerFactory keyManagerFactory, final TrustManagerFactory trustManagerFactory,
-                     final APNServerConfig serverConfig)
+    public APNClient(final KeyManagerFactory keyManagerFactory, final TrustManagerFactory trustManagerFactory, final APSConfig serverConfig)
             throws NoSuchAlgorithmException, KeyManagementException {
 
-        connector = new NioSocketConnector();
-        connector.setHandler( new APNsHandler() );
-        connector.getFilterChain().addFirst( "ssl", //
-                new SslFilter(
-                        createSSLContext( getServerConfig().getEncryptionProtocol(), getKeyManagerFactory(), getTrustManagerFactory() ) ) );
+        feedbackConnector.getSessionConfig().setUseReadOperation( true );
 
         configure( keyManagerFactory, trustManagerFactory, serverConfig );
     }
@@ -141,11 +136,21 @@ public class APNClient implements APNClientService {
     private void updateSSL()
             throws NoSuchAlgorithmException, KeyManagementException {
 
-        connector.getFilterChain().replace( "ssl", //
-                new SslFilter(
-                        createSSLContext( getServerConfig().getEncryptionProtocol(), getKeyManagerFactory(), getTrustManagerFactory() ) ) );
+        SslFilter sslFilter = new SslFilter(
+                createSSLContext( getServerConfig().getEncryptionProtocol(), getKeyManagerFactory(), getTrustManagerFactory() ) );
+        sslFilter.setUseClientMode( true );
 
-        closeAPNs();
+        if (!initialized) {
+            apsConnector.setHandler( new APSHandler() );
+            apsConnector.getFilterChain().addLast( "ssl", sslFilter );
+            feedbackConnector.getFilterChain().addLast( "ssl", sslFilter );
+            initialized = true;
+        } else {
+            apsConnector.getFilterChain().replace( "ssl", sslFilter );
+            feedbackConnector.getFilterChain().replace( "ssl", sslFilter );
+        }
+
+        closeAPS();
         closeFeedbackService();
     }
 
@@ -156,7 +161,7 @@ public class APNClient implements APNClientService {
      *
      * @param keyStore           The keystore which provides all required SSL keys and certificates.
      * @param privateKeyPassword The password which protects the required {@code keyStore}'s private key.
-     * @param serverConfig       The {@link APNServerConfig} that determines the host configuration of the Apple Push Notification server
+     * @param serverConfig       The {@link APSConfig} that determines the host configuration of the Apple Push Notification server
      *                           and Feedback service.
      *
      * @return <code>this</code> for chaining.
@@ -167,7 +172,7 @@ public class APNClient implements APNClientService {
      * @throws KeyStoreException         The {@code keyStore} had not been properly loaded/initialized or is corrupt.
      * @throws KeyManagementException    The SSL context could not be initialized using the available private keys.
      */
-    public APNClient configure(final KeyStore keyStore, final String privateKeyPassword, final APNServerConfig serverConfig)
+    public APNClient configure(final KeyStore keyStore, final String privateKeyPassword, final APSConfig serverConfig)
             throws UnrecoverableKeyException, NoSuchAlgorithmException, KeyStoreException, KeyManagementException {
 
         return configure( PKIUtils.createKeyManagerFactory( keyStore, privateKeyPassword ), PKIUtils.createTrustManagerFactory( keyStore ),
@@ -182,7 +187,7 @@ public class APNClient implements APNClientService {
      *
      * @param trustManagerFactory The factory that will create the SSL context's {@link TrustManager}s.
      * @param keyManagerFactory   The factory that will create the SSL context's {@link KeyManager}s.
-     * @param serverConfig        The {@link APNServerConfig} that determines the host configuration of the Apple Push Notification server
+     * @param serverConfig        The {@link APSConfig} that determines the host configuration of the Apple Push Notification server
      *                            and Feedback service.
      *
      * @return <code>this</code> for chaining.
@@ -191,7 +196,7 @@ public class APNClient implements APNClientService {
      * @throws KeyManagementException   The SSL context could not be initialized using the available private keys.
      */
     public synchronized APNClient configure(final KeyManagerFactory keyManagerFactory, final TrustManagerFactory trustManagerFactory,
-                                            final APNServerConfig serverConfig)
+                                            final APSConfig serverConfig)
             throws NoSuchAlgorithmException, KeyManagementException {
 
         this.keyManagerFactory = keyManagerFactory;
@@ -215,12 +220,13 @@ public class APNClient implements APNClientService {
      */
     public void stop() {
 
-        connector.dispose();
+        apsConnector.dispose();
+        feedbackConnector.dispose();
         apnQueue.stop();
     }
 
     /**
-     * Creates the SSL context that will be used when connecting to the APNs.
+     * Creates the SSL context that will be used when connecting to the APS.
      *
      * @param protocol            The SSL/TLS protocol to use for secure transport encryption. <p> Valid values depend on what is supported
      *                            by the <code>sslProvider</code>, but generally speaking there is: {@code SSL, SSLv2, SSLv3, TLS, TLSv1,}
@@ -312,7 +318,7 @@ public class APNClient implements APNClientService {
      * @param payLoadLength The byte size of the {@link APSPayload} when serialized and encoded with the character set as defined by {@link
      *                      #getPayloadEncoding()}.
      *
-     * @return The byte size of the notification interface that will be sent to the APNs.
+     * @return The byte size of the notification interface that will be sent to the APS.
      */
     private static int getInterfaceByteSize(final short tokenLength, final short payLoadLength) {
 
@@ -337,36 +343,35 @@ public class APNClient implements APNClientService {
     }
 
     /**
-     * Dispatch the given notification interface to the APNs.
+     * Dispatch the given notification interface to the APS.
      * <p/>
-     * <p> This operation will establish a connection to the configured APNs if one is not active already. Note that the connection will
+     * <p> This operation will establish a connection to the configured APS if one is not active already. Note that the connection will
      * not
-     * be terminated automatically. You are responsible for calling {@link #closeAPNs()} when you determine you won't be dispatching any
+     * be terminated automatically. You are responsible for calling {@link #closeAPS} when you determine you won't be dispatching any
      * more messages soon. </p>
-     *
      *
      * @param notificationInterface The {@link ByteBuffer} containing the raw interface of the notification data to send.
      *
-     * @throws APNException         If the system failed to initiate a connection or write the notification to the APNs.
-     * @throws InterruptedException If the network was interrupted while connecting or sending the notification to the APNs.
+     * @throws APNException         If the system failed to initiate a connection or write the notification to the APS.
+     * @throws InterruptedException If the network was interrupted while connecting or sending the notification to the APS.
      */
     public synchronized void send(final ByteBuffer notificationInterface)
             throws InterruptedException, APNException {
 
-        if (apnsSession == null || !apnsSession.isConnected()) {
-            apnsSession = null;
+        if (apsSession == null || !apsSession.isConnected()) {
+            apsSession = null;
 
-            ConnectFuture connectFuture = connector.connect( getServerConfig().getApnsAddress() ).await();
+            ConnectFuture connectFuture = apsConnector.connect( getServerConfig().getAPSAddress() ).await();
             Throwable connectException = connectFuture.getException();
             if (connectException != null)
                 throw new APNException( connectException );
 
-            apnsSession = connectFuture.getSession();
-            if (apnsSession == null)
+            apsSession = connectFuture.getSession();
+            if (apsSession == null)
                 throw new APNException( "Connection failed for an unknown reason." );
         }
 
-        WriteFuture writeFuture = apnsSession.write( notificationInterface ).await();
+        WriteFuture writeFuture = apsSession.write( IoBuffer.wrap( notificationInterface ) ).await();
         Throwable writeException = writeFuture.getException();
         if (writeException != null)
             throw new APNException( writeException );
@@ -381,7 +386,7 @@ public class APNClient implements APNClientService {
         if (feedbackSession != null && feedbackSession.isConnected())
             throw new APNException( "Feedback Service is already being polled." );
 
-        ConnectFuture connectFuture = connector.connect( getServerConfig().getFeedBackAddress() ).await();
+        ConnectFuture connectFuture = feedbackConnector.connect( getServerConfig().getFeedBackAddress() ).await();
         Throwable connectException = connectFuture.getException();
         if (connectException != null)
             throw new APNException( connectException );
@@ -401,7 +406,7 @@ public class APNClient implements APNClientService {
                 feedbackBuffer.put( (IoBuffer) readFuture.getMessage() ).flip();
 
                 // Parse the bytes in the feedbackBuffer as unreachable device records.
-                while (feedbackBuffer.remaining() > 0)
+                while (feedbackBuffer.hasRemaining())
                     try {
                         feedbackBuffer.mark();
 
@@ -429,8 +434,10 @@ public class APNClient implements APNClientService {
         }
         while (!readFuture.isClosed());
 
-        if (feedbackBuffer.position() > 0)
-            logger.wrn( "Not all feedback bytes were consumed.  Bytes left: %d", feedbackBuffer.position() );
+        feedbackBuffer.flip();
+        if (feedbackBuffer.hasRemaining())
+            logger.wrn( "Not all feedback bytes were consumed.  Bytes left: %d", feedbackBuffer.remaining() );
+        feedbackBuffer.clear();
 
         return feedbackDevices;
     }
@@ -520,7 +527,7 @@ public class APNClient implements APNClientService {
     /**
      * @return The server configuration that is used to establish communication to the Apple services.
      */
-    public synchronized APNServerConfig getServerConfig() {
+    public synchronized APSConfig getServerConfig() {
 
         return serverConfig;
     }
@@ -533,7 +540,7 @@ public class APNClient implements APNClientService {
      * @throws NoSuchAlgorithmException The {@code keyStore} provider does not support the necessary algorithms.
      * @throws KeyManagementException   The SSL context could not be initialized using the available private keys.
      */
-    public synchronized APNClient setServerConfig(final APNServerConfig serverConfig)
+    public synchronized APNClient setServerConfig(final APSConfig serverConfig)
             throws NoSuchAlgorithmException, KeyManagementException {
 
         this.serverConfig = serverConfig;
@@ -543,13 +550,13 @@ public class APNClient implements APNClientService {
     }
 
     /**
-     * @param apnsCallback A callback that should be invoked when an APNs response is received.
+     * @param apsCallback A callback that should be invoked when an APS response is received.
      *
      * @return <code>this</code> for chaining.
      */
-    public APNClient setResponseCallback(final APNResponseCallback apnsCallback) {
+    public APNClient setResponseCallback(final APNResponseCallback apsCallback) {
 
-        this.apnsCallback = apnsCallback;
+        this.apsCallback = apsCallback;
         return this;
     }
 
@@ -650,9 +657,9 @@ public class APNClient implements APNClientService {
      *
      * @return The network connector used by this {@link APNClient}.
      */
-    public NioSocketConnector getConnector() {
+    public NioSocketConnector getAPSConnector() {
 
-        return connector;
+        return apsConnector;
     }
 
     /**
@@ -662,13 +669,13 @@ public class APNClient implements APNClientService {
      * expected to close automatically when Apple finished dumping its queue. Use {@link #closeFeedbackService()} if for some reason you
      * want to do this anyway. </p>
      */
-    public synchronized void closeAPNs() {
+    public synchronized void closeAPS() {
 
-        if (apnsSession == null || !apnsSession.isConnected() || apnsSession.isClosing())
+        if (apsSession == null || !apsSession.isConnected() || apsSession.isClosing())
             return;
 
-        apnsSession.close( false );
-        apnsSession = null;
+        apsSession.close( false );
+        apsSession = null;
     }
 
     /**
@@ -683,7 +690,7 @@ public class APNClient implements APNClientService {
         feedbackSession = null;
     }
 
-    private class APNsHandler extends StreamIoHandler {
+    private class APSHandler extends IoHandlerAdapter {
 
         private final IoBuffer responseBuffer = IoBuffer.allocate(
                 // Command
@@ -694,53 +701,71 @@ public class APNClient implements APNClientService {
                 Integer.SIZE / Byte.SIZE );
 
         @Override
-        public void sessionOpened(final IoSession session) {
+        public void sessionOpened(final IoSession session)
+                throws Exception {
 
-            logger.inf( "Connected to APNs" );
+            logger.inf( "Connected to APS: %s", session );
 
             responseBuffer.clear();
             responseBuffer.order( getByteOrder() );
+        }
 
-            super.sessionOpened( session );
+        @Override
+        public void messageReceived(final IoSession session, final Object message)
+                throws Exception {
+
+            IoBuffer buf = (IoBuffer) message;
+
+            logger.dbg( "Received %d bytes of APS response", buf.remaining() );
+            responseBuffer.put( buf );
+
+            responseBuffer.flip();
+            while (responseBuffer.hasRemaining())
+                try {
+                    responseBuffer.mark();
+                    byte command = responseBuffer.get();
+
+                    if (command == (byte) 8) {
+                        byte status = responseBuffer.get();
+                        int identifier = responseBuffer.getInt();
+
+                        final APNResponse response = new APNResponse( status, identifier );
+                        logger.inf( "Received APN response: %s", response );
+                        if (apsCallback != null)
+                            apsCallback.responseReceived( response );
+                    } else {
+                        logger.wrn( "APN response command not implemented: %d", Byte.valueOf( command ).intValue() );
+                        responseBuffer.position( responseBuffer.limit() );
+                    }
+                }
+                catch (BufferUnderflowException ignored) {
+                    // Not enough bytes in the responseBuffer for a whole record; undo our last read operations.
+                    responseBuffer.reset();
+                    break;
+                }
+
+            responseBuffer.compact();
+        }
+
+        @Override
+        public void messageSent(final IoSession session, final Object message)
+                throws Exception {
+
+            IoBuffer buf = (IoBuffer) message;
+
+            logger.dbg( "Sent %d bytes of APS request", buf.remaining() );
         }
 
         @Override
         public void sessionClosed(final IoSession session)
                 throws Exception {
 
-            logger.inf( "Disconnected from APNs" );
+            logger.inf( "Disconnected from APS: %s", session );
 
             responseBuffer.flip();
-            byte command = responseBuffer.get();
-
-            if (command == (byte) 8) {
-                byte status = responseBuffer.get();
-                int identifier = responseBuffer.getInt();
-                final APNResponse response = new APNResponse( status, identifier );
-                logger.inf( "Received APN response: %s", response );
-
-                if (apnsCallback != null)
-                    apnsCallback.responseReceived( response );
-            } else {
-                logger.wrn( "APN response command not implemented: %d", Byte.valueOf( command ).intValue() );
-                responseBuffer.position( responseBuffer.limit() );
-            }
-
-            responseBuffer.compact();
-
-            super.sessionClosed( session );
-        }
-
-        @Override
-        protected void processStreamIo(final IoSession session, final InputStream in, final OutputStream out) {
-
-            try {
-                logger.dbg( "Received %d bytes of APNs response", in.available() );
-                responseBuffer.put( ByteStreams.toByteArray( in ) );
-            }
-            catch (IOException e) {
-                throw logger.bug( e );
-            }
+            if (responseBuffer.hasRemaining())
+                logger.wrn( "Not all APN response bytes were consumed.  Bytes left: %d", responseBuffer.remaining() );
+            responseBuffer.clear();
         }
     }
 }

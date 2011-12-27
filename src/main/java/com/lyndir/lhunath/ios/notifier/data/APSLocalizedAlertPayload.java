@@ -21,9 +21,10 @@ import com.lyndir.lhunath.opal.system.util.ObjectUtils;
 
 
 /**
- * <h2>{@link APSLocalizedAlertPayload}<br> <sub>The payload for an APNs notification message.</sub></h2>
- *
- * <p> The payload describes the parameters for the actual notification. This involves whether to display an alert message, whether to set a
+ * <h2>{@link APSLocalizedAlertPayload}<br> <sub>The payload for an Apple push notification message.</sub></h2>
+ * <p/>
+ * <p> The payload describes the parameters for the actual notification. This involves whether to display an alert message, whether to set
+ * a
  * badge on the application icon or whether to play a sound. </p> <p> <i>Jun 23, 2009</i> </p>
  *
  * @author lhunath
@@ -34,11 +35,11 @@ import com.lyndir.lhunath.opal.system.util.ObjectUtils;
 public class APSLocalizedAlertPayload extends APSPayload {
 
     /**
-     * <h2>{@link Alert}<br> <sub>An alert message to display as a result of an APNs notification.</sub></h2>
-     *
+     * <h2>{@link Alert}<br> <sub>An alert message to display as a result of a notification.</sub></h2>
+     * <p/>
      * <p> Alert messages can contain just a body or they can specify localization keys as defined in the destination application's
      * {@code Localizable.strings}. </p>
-     *
+     * <p/>
      * <p> <i>Jun 23, 2009</i> </p>
      *
      * @author lhunath

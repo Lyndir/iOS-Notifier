@@ -22,7 +22,7 @@ import java.util.Arrays;
 
 
 /**
- * <h2>{@link APNRegistration}<br> <sub>An iOS device registration with the APNs.</sub></h2>
+ * <h2>{@link APNRegistration}<br> <sub>An iOS device registration with the APS.</sub></h2>
  * <p/>
  * <p>An APN registration identifies both a user's device and the application that registered it.</p>
  * <p> <i>Jun 23, 2009</i> </p>
@@ -36,7 +36,7 @@ public class APNRegistration {
     /**
      * Create a new {@link APNRegistration} instance.
      *
-     * @param token The APN registration token. This token will identify the destination device and application to the APNs.
+     * @param token The APN registration token. This token will identify the destination device and application to the APS.
      */
     public APNRegistration(final byte[] token) {
 
@@ -49,8 +49,7 @@ public class APNRegistration {
      * Create a new {@link APNRegistration} instance.
      *
      * @param hexToken The APN registration token as a string of hexadecimal characters. This token will identify the destination device
-     *                 and
-     *                 application to the APNs.
+     *                 and application to the APS.
      */
     public APNRegistration(final String hexToken) {
 

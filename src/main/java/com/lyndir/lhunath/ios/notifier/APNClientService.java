@@ -36,20 +36,19 @@ public interface APNClientService {
 
     /**
      * Query the Apple push notification feedback service for a list of devices that have become unreachable.  This includes all APN
-     * registrations that a notification was sent to but could not be delivered by the APNs.
+     * registrations that a notification was sent to but could not be delivered by the APS.
      *
      * @return A map of devices that have become unavailable since the last time the feedback service was polled.  The device is mapped to
-     *         the date that the APNs noticed that the registration became unreachable.
+     *         the date that the APS noticed that the registration became unreachable.
      *
-     * @throws APNException         If the system failed to initiate a connection or write the notification to the APNs.
-     * @throws InterruptedException If the network was interrupted while connecting or sending the notification to the APNs.
+     * @throws APNException         If the system failed to initiate a connection or write the notification to the APS.
+     * @throws InterruptedException If the network was interrupted while connecting or sending the notification to the APS.
      */
     Map<APNRegistration, Date> fetchUnreachableDevices()
             throws InterruptedException, APNException;
 
     /**
-     * Queue a notification to be sent to the APNs through the {@link APNQueue}.
-     *
+     * Queue a notification to be sent to the APS through the {@link APNQueue}.
      *
      * @param device     The device registration that should receive the notification.
      * @param payload    The payload that describes the notification to send to the client. Remember that the total payload size is limited

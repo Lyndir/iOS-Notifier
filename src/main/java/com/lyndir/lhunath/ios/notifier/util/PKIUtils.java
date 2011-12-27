@@ -15,19 +15,13 @@
  */
 package com.lyndir.lhunath.ios.notifier.util;
 
-import java.security.KeyStore;
-import java.security.KeyStoreException;
-import java.security.NoSuchAlgorithmException;
-import java.security.UnrecoverableKeyException;
-import javax.net.ssl.KeyManager;
-import javax.net.ssl.KeyManagerFactory;
-import javax.net.ssl.TrustManager;
-import javax.net.ssl.TrustManagerFactory;
+import java.security.*;
+import javax.net.ssl.*;
 
 
 /**
  * <h2>{@link PKIUtils}<br> <sub>Public Key Infrastructure Utilities.</sub></h2>
- *
+ * <p/>
  * <p> <i>Nov 20, 2009</i> </p>
  *
  * @author lhunath
@@ -36,7 +30,7 @@ public abstract class PKIUtils {
 
     /**
      * Creates the factory for {@link KeyManager}s which provide the client identity.
-     *
+     * <p/>
      * <p> Uses private key entries in the given <code>keyStore</code> and unlocks them with the given {@code privateKeyPassword}.
      * </p>
      *
@@ -61,7 +55,7 @@ public abstract class PKIUtils {
 
     /**
      * Creates the factory for {@link TrustManager}s.
-     *
+     * <p/>
      * <p> The factory will provide simple trust for each trusted certificate in the given {@code keyStore}.<br> No additional optional
      * PKIX validation is performed on the trust path. </p>
      *

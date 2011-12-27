@@ -5,12 +5,12 @@ package com.lyndir.lhunath.ios.notifier.data;
  *
  * @author lhunath
  */
-public enum APNServerConfigs {
+public enum APSConfigs {
 
     /**
      * The default Apple Push Notification Sandbox environment to be used during development and testing.
      */
-    SANDBOX( new APNServerConfig( //
+    SANDBOX( new APSConfig( //
             "gateway.sandbox.push.apple.com", 2195, //
             "feedback.sandbox.push.apple.com", 2196, //
             "TLSv1" ) ),
@@ -18,7 +18,7 @@ public enum APNServerConfigs {
     /**
      * The default Apple Push Notification Production environment to be used for live applications.
      */
-    PRODUCTION( new APNServerConfig( //
+    PRODUCTION( new APSConfig( //
             "gateway.push.apple.com", 2195, //
             "feedback.push.apple.com", 2196, //
             "TLSv1" ) ),
@@ -26,23 +26,23 @@ public enum APNServerConfigs {
     /**
      * Connect to a dummy environment on the local host for debugging purposes.
      * <p/>
-     * <p> You'll need a TLSv1 supporting server running on <code>localhost</code> at ports <code>2195</code> (APNs) and {@code 2196}
+     * <p> You'll need a TLSv1 supporting server running on <code>localhost</code> at ports <code>2195</code> (APS) and {@code 2196}
      * (Feedback service). You could, for example, use <code>stunnel</code> & {@code netcat} for this purpose. </p>
      */
-    LOCAL( new APNServerConfig( //
+    LOCAL( new APSConfig( //
             "localhost", 2195, //
             "localhost", 2196, //
             "TLSv1" ) );
 
-    private final APNServerConfig apnServerConfig;
+    private final APSConfig apsConfig;
 
-    APNServerConfigs(APNServerConfig apnServerConfig) {
+    APSConfigs(APSConfig apsConfig) {
 
-        this.apnServerConfig = apnServerConfig;
+        this.apsConfig = apsConfig;
     }
 
-    public APNServerConfig get() {
+    public APSConfig get() {
 
-        return apnServerConfig;
+        return apsConfig;
     }
 }

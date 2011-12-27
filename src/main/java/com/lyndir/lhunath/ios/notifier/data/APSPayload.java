@@ -21,9 +21,10 @@ import com.lyndir.lhunath.opal.system.util.ObjectUtils;
 
 
 /**
- * <h2>{@link APSPayload}<br> <sub>The payload for an APNs notification message.</sub></h2>
- *
- * <p> The payload describes the parameters for the actual notification. This involves whether to display an alert message, whether to set a
+ * <h2>{@link APSPayload}<br> <sub>The payload for an Apple push notification message.</sub></h2>
+ * <p/>
+ * <p> The payload describes the parameters for the actual notification. This involves whether to display an alert message, whether to set
+ * a
  * badge on the application icon or whether to play a sound. </p> <p> <i>Jun 23, 2009</i> </p>
  *
  * @author lhunath

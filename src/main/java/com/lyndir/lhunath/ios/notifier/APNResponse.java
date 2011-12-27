@@ -6,7 +6,7 @@ import com.lyndir.lhunath.opal.system.util.ObjectUtils;
 
 /**
  * <h2>{@link APNResponse}<br> <sub>[in short] (TODO).</sub></h2>
- *
+ * <p/>
  * <p> <i>02 22, 2011</i> </p>
  *
  * @author lhunath

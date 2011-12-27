@@ -24,15 +24,15 @@ import java.util.concurrent.*;
 
 
 /**
- * <h2>{@link APNQueue}<br> <sub>A queue which manages dispatching of notifications to the APNs.</sub></h2>
+ * <h2>{@link APNQueue}<br> <sub>A queue which manages dispatching of notifications to the APS.</sub></h2>
  * <p/>
  * <p> This queue collects notifications and dispatches them to the Apple Push Notification server using an {@link APNClient}. It is
- * designed to gather multiple notifications and dispatch them on the same connection to the APNs. </p>
+ * designed to gather multiple notifications and dispatch them on the same connection to the APS. </p>
  * <p/>
- * <p> As soon as a notification arrives, a connection to the APNs is established by the {@link APNClient}. The {@link APNQueue} then waits
+ * <p> As soon as a notification arrives, a connection to the APS is established by the {@link APNClient}. The {@link APNQueue} then waits
  * for more notifications to arrive and dispatches each over this existing connection. After a configurable timeout (which defaults to
  * {@value #DEFAULT_TIMEOUT} milliseconds) of not receiving any additional notifications, the {@link APNQueue} shuts down {@link APNClient}
- * 's connection to the APNs and waits for more notifications in silence. When more arrive, this cycle begins anew. </p>
+ * 's connection to the APS and waits for more notifications in silence. When more arrive, this cycle begins anew. </p>
  * <p/>
  * <p> <i>Jun 30, 2009</i> </p>
  *
@@ -42,7 +42,7 @@ public class APNQueue implements Runnable {
 
     private static final Logger logger = Logger.get( APNQueue.class );
 
-    protected static final long DEFAULT_TIMEOUT = 10 * 60 * 1000 /* By default, wait 10 min before closing the APNs link. */;
+    protected static final long DEFAULT_TIMEOUT = 10 * 60 * 1000 /* By default, wait 10 min before closing the APS link. */;
 
     private final APNClient apnClient;
     private final BlockingQueue<ByteBuffer> apnQueue  = new LinkedBlockingQueue<ByteBuffer>();
@@ -63,7 +63,7 @@ public class APNQueue implements Runnable {
     }
 
     /**
-     * @return The amount of milliseconds after which the connection to the APNs is shut down.
+     * @return The amount of milliseconds after which the connection to the APS is shut down.
      */
     public long getTimeout() {
 
@@ -71,7 +71,7 @@ public class APNQueue implements Runnable {
     }
 
     /**
-     * @param timeout The amount of milliseconds after which the connection to the APNs is shut down.
+     * @param timeout The amount of milliseconds after which the connection to the APS is shut down.
      */
     public void setTimeout(final long timeout) {
 
@@ -113,8 +113,8 @@ public class APNQueue implements Runnable {
                 logger.err( t, "Caught unexpected error." );
             }
             finally {
-                logger.inf( "Disconnecting from APNs." );
-                apnClient.closeAPNs();
+                logger.inf( "Disconnecting from APS." );
+                apnClient.closeAPS();
 
                 if (!deadQueue.isEmpty()) {
                     logger.inf( "Requeueing %d dead notifications.", deadQueue.size() );
